@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cricket Score Tracker</title>
+<style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
+    h2 { margin-top: 30px; }
+    .container { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);}
+    label { display: block; margin-top: 10px; }
+    input, select, button { margin-top: 5px; padding: 5px; }
+</style>
+</head>
+<body>
+<div class="container">
+    <h1>Cricket Score Tracker</h1>
+
+    <h2>Team Details</h2>
+    <label>Team 1 Name: <input type="text" id="team1" value="Team A"></label>
+    <label>Team 2 Name: <input type="text" id="team2" value="Team B"></label>
+
+    <h2>Player Details</h2>
+    <label>Batsman on Strike: <input type="text" id="batsman1"></label>
+    <label>Non-Striker Batsman: <input type="text" id="batsman2"></label>
+    <label>Bowler: <input type="text" id="bowler"></label>
+
+    <h2>Score Inputs</h2>
+    <label>Runs Scored: <input type="number" id="runs" value="0"></label>
+    <label>Extra Type:
+        <select id="extra">
+            <option value="none">None</option>
+            <option value="wide">Wide</option>
+            <option value="noBall">No Ball</option>
+            <option value="legBye">Leg Bye</option>
+        </select>
+    </label>
+    <button onclick="addBall()">Add Ball</button>
+
+    <h2>Match Stats</h2>
+    <p id="teamScore">Team Score: 0/0</p>
+    <p id="playerRuns">Batsman Runs: 0</p>
+    <p id="bowlerStats">Bowler: 0 runs, 0 overs, 0 balls, 0 wides, 0 no-balls</p>
+    <p id="oversLeft">Overs Left: 20</p>
+    <p id="ballsLeft">Balls Left in Current Over: 6</p>
+
+    <h2>Actions</h2>
+    <button onclick="switchSides()">Switch Sides</button>
+    <button onclick="exportToExcel()">Export to Excel</button>
+</div>
+
+<script>
+let teamRuns = 0;
+let wickets = 0;
+let overs = 0;
+let balls = 0;
+let oversLimit = 20;
+
+let batsmanRuns = {1:0, 2:0};
+let onStrike = 1;
+let bowlerRuns = 0;
+let bowlerBalls = 0;
+let bowlerWides = 0;
+let bowlerNoBalls = 0;
+let bowlerOvers = 0;
+let ballsLeft = 6;
+
+let team1Name = document.getElementById("team1").value;
+let team2Name = document.getElementById("team2").value;
+let teamBatting = team1Name;
+
+function addBall() {
+    let runs = parseInt(document.getElementById("runs").value);
+    let extra = document.getElementById("extra").value;
+
+    // Update scores
+    if(extra === "wide" || extra === "noBall" || extra === "legBye") {
+        teamRuns += runs + 1; // extra ball adds 1 run
+        if(extra === "wide") bowlerWides++;
+        if(extra === "noBall") bowlerNoBalls++;
+    } else {
+        teamRuns += runs;
+        batsmanRuns[onStrike] += runs;
+        balls++;
+        bowlerBalls++;
+        if(balls >= 6) {
+            overs++;
+            bowlerOvers++;
+            balls = 0;
+            ballsLeft = 6;
+            swapStrike();
+        } else {
+            ballsLeft = 6 - balls;
+        }
+        if(runs % 2 !== 0) swapStrike();
+    }
+
+    updateStats();
+}
+
+function swapStrike() {
+    onStrike = onStrike === 1 ? 2 : 1;
+}
+
+function updateStats() {
+    document.getElementById("teamScore").innerText = `${teamBatting} Score: ${teamRuns}/${wickets}`;
+    document.getElementById("playerRuns").innerText = `Batsman ${onStrike} Runs: ${batsmanRuns[onStrike]}`;
+    document.getElementById("bowlerStats").innerText = `Bowler: ${bowlerRuns} runs, ${bowlerOvers} overs, ${bowlerBalls} balls, ${bowlerWides} wides, ${bowlerNoBalls} no-balls`;
+    document.getElementById("oversLeft").innerText = `Overs Left: ${oversLimit - overs}`;
+    document.getElementById("ballsLeft").innerText = `Balls Left in Current Over: ${ballsLeft}`;
+}
+
+function switchSides() {
+    if(teamBatting === team1Name) teamBatting = team2Name;
+    else teamBatting = team1Name;
+
+    // Reset stats for new innings
+    teamRuns = 0;
+    wickets = 0;
+    overs = 0;
+    balls = 0;
+    ballsLeft = 6;
+    batsmanRuns = {1:0, 2:0};
+    bowlerRuns = 0;
+    bowlerBalls = 0;
+    bowlerWides = 0;
+    bowlerNoBalls = 0;
+    bowlerOvers = 0;
+    updateStats();
+}
+
+function exportToExcel() {
+    let csvContent = "data:text/csv;charset=utf-8,";
+    csvContent += `Team Batting,${teamBatting}\n`;
+    csvContent += `Batsman 1,${document.getElementById("batsman1").value},Runs,${batsmanRuns[1]}\n`;
+    csvContent += `Batsman 2,${document.getElementById("batsman2").value},Runs,${batsmanRuns[2]}\n`;
+    csvContent += `Bowler,${document.getElementById("bowler").value},Runs,${bowlerRuns},Balls,${bowlerBalls},Wides,${bowlerWides},No Balls,${bowlerNoBalls},Overs,${bowlerOvers}\n`;
+    csvContent += `Team Runs,${teamRuns}\n`;
+    csvContent += `Overs Bowled,${overs}\n`;
+    csvContent += `Balls in Current Over,${ballsLeft}\n`;
+
+    var encodedUri = encodeURI(csvContent);
+    var link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", "cricket_score.csv");
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+</script>
+</body>
+</html>
