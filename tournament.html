@@ -2,90 +2,149 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tournament Setup</title>
+  <title>Tournament Setup - Rockets Cricket Club</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #121212;
+      background: #0F2447;
       color: white;
-      margin: 0;
-      padding: 20px;
+      padding: 30px;
+      text-align: center;
     }
-    h1 {
-      color: #8384D4;
+    h1, h2 {
+      font-family: "Copperplate Gothic Light", "Copperplate", Arial, sans-serif;
+      font-size: 24px;
+      margin-bottom: 20px;
+    }
+    .team-section {
+      background: #1a3570;
+      padding: 20px;
+      margin: 20px auto;
+      border-radius: 12px;
+      width: 80%;
+      max-width: 700px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
     }
     label {
       display: block;
       margin-top: 10px;
+      font-size: 14px;
+      text-align: left;
     }
-    input, select, textarea, button {
-      margin-top: 5px;
-      padding: 10px;
-      width: 100%;
-      border-radius: 5px;
+    input {
+      padding: 8px;
+      margin: 6px 0;
       border: none;
-      outline: none;
+      border-radius: 6px;
+      width: 95%;
+      font-size: 14px;
     }
-    button {
-      background-color: #8384D4;
-      color: white;
-      font-weight: bold;
-      cursor: pointer;
+    .players-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
       margin-top: 15px;
     }
+    button {
+      padding: 12px 20px;
+      margin-top: 20px;
+      background: #8384D4;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      cursor: pointer;
+    }
     button:hover {
-      background-color: #6a6bd1;
+      background: #6a6bc0;
     }
   </style>
 </head>
 <body>
-
   <h1>🏏 Tournament Setup</h1>
-  <form id="setupForm">
-    <label>Tournament or Individual Match?</label>
-    <select id="matchType">
-      <option value="tournament">Tournament</option>
-      <option value="single">Single Match</option>
-    </select>
 
-    <label>Team 1 Name:</label>
-    <input type="text" id="team1" required>
+  <!-- Team 1 -->
+  <div class="team-section">
+    <h2>Team 1</h2>
+    <label>Team Name</label>
+    <input type="text" id="team1Name" placeholder="Enter Team 1 Name">
 
-    <label>Team 1 Players (comma separated):</label>
-    <textarea id="team1Players" rows="3"></textarea>
+    <label>Players (Max 8)</label>
+    <div class="players-grid">
+      <input type="text" id="team1Player1" placeholder="Player 1">
+      <input type="text" id="team1Player2" placeholder="Player 2">
+      <input type="text" id="team1Player3" placeholder="Player 3">
+      <input type="text" id="team1Player4" placeholder="Player 4">
+      <input type="text" id="team1Player5" placeholder="Player 5">
+      <input type="text" id="team1Player6" placeholder="Player 6">
+      <input type="text" id="team1Player7" placeholder="Player 7">
+      <input type="text" id="team1Player8" placeholder="Player 8">
+    </div>
 
-    <label>Team 2 Name:</label>
-    <input type="text" id="team2" required>
+    <label>Captain (must be one of above)</label>
+    <input type="text" id="team1Captain" placeholder="Enter Captain Name">
+  </div>
 
-    <label>Team 2 Players (comma separated):</label>
-    <textarea id="team2Players" rows="3"></textarea>
+  <!-- Team 2 -->
+  <div class="team-section">
+    <h2>Team 2</h2>
+    <label>Team Name</label>
+    <input type="text" id="team2Name" placeholder="Enter Team 2 Name">
 
-    <label>Overs:</label>
-    <input type="number" id="overs" min="1" required>
+    <label>Players (Max 8)</label>
+    <div class="players-grid">
+      <input type="text" id="team2Player1" placeholder="Player 1">
+      <input type="text" id="team2Player2" placeholder="Player 2">
+      <input type="text" id="team2Player3" placeholder="Player 3">
+      <input type="text" id="team2Player4" placeholder="Player 4">
+      <input type="text" id="team2Player5" placeholder="Player 5">
+      <input type="text" id="team2Player6" placeholder="Player 6">
+      <input type="text" id="team2Player7" placeholder="Player 7">
+      <input type="text" id="team2Player8" placeholder="Player 8">
+    </div>
 
-    <button type="submit">Start Match</button>
-  </form>
+    <label>Captain (must be one of above)</label>
+    <input type="text" id="team2Captain" placeholder="Enter Captain Name">
+  </div>
+
+  <button onclick="saveTournament()">Save Tournament</button>
 
   <script>
-    document.getElementById("setupForm").addEventListener("submit", function(e) {
-      e.preventDefault();
-
-      const matchData = {
-        matchType: document.getElementById("matchType").value,
-        team1: document.getElementById("team1").value,
-        team1Players: document.getElementById("team1Players").value.split(",").map(p => p.trim()),
-        team2: document.getElementById("team2").value,
-        team2Players: document.getElementById("team2Players").value.split(",").map(p => p.trim()),
-        overs: parseInt(document.getElementById("overs").value),
-        score: { team1: { runs: 0, wickets: 0, overs: 0 }, team2: { runs: 0, wickets: 0, overs: 0 } }
+    function saveTournament() {
+      let tournamentData = {
+        team1: {
+          name: document.getElementById('team1Name').value,
+          players: [
+            document.getElementById('team1Player1').value,
+            document.getElementById('team1Player2').value,
+            document.getElementById('team1Player3').value,
+            document.getElementById('team1Player4').value,
+            document.getElementById('team1Player5').value,
+            document.getElementById('team1Player6').value,
+            document.getElementById('team1Player7').value,
+            document.getElementById('team1Player8').value
+          ],
+          captain: document.getElementById('team1Captain').value
+        },
+        team2: {
+          name: document.getElementById('team2Name').value,
+          players: [
+            document.getElementById('team2Player1').value,
+            document.getElementById('team2Player2').value,
+            document.getElementById('team2Player3').value,
+            document.getElementById('team2Player4').value,
+            document.getElementById('team2Player5').value,
+            document.getElementById('team2Player6').value,
+            document.getElementById('team2Player7').value,
+            document.getElementById('team2Player8').value
+          ],
+          captain: document.getElementById('team2Captain').value
+        }
       };
 
-      localStorage.setItem("matchData", JSON.stringify(matchData));
-      alert("Match setup saved! Now open score.html to start scoring.");
-      window.location.href = "score.html";
-    });
+      localStorage.setItem("tournamentData", JSON.stringify(tournamentData));
+      alert("Tournament Data Saved Successfully!");
+    }
   </script>
-
 </body>
 </html>
