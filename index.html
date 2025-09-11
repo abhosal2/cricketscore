@@ -6,19 +6,35 @@
 <title>Cricket Score Tracker</title>
 <style>
     body { font-family: Arial, sans-serif; padding: 20px; background: #f4f4f4; }
-    h2 { margin-top: 30px; }
+    h1 { color: #8384D4; }
+    h2 { margin-top: 30px; color: #333; }
     .container { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1);}
     label { display: block; margin-top: 10px; }
-    input, select, button { margin-top: 5px; padding: 5px; }
+    input, select, button { margin-top: 5px; padding: 5px; border-radius: 5px; border: 1px solid #ccc; }
+    button { background: #8384D4; color: #fff; border: none; cursor: pointer; }
+    button:hover { background: #6b6cc0; }
+    .mode-section { background: #eaeaff; padding: 15px; border-radius: 8px; margin-bottom: 20px; }
 </style>
 </head>
 <body>
 <div class="container">
     <h1>Cricket Score Tracker</h1>
 
-    <h2>Team Details</h2>
-    <label>Team 1 Name: <input type="text" id="team1" value="Team A"></label>
-    <label>Team 2 Name: <input type="text" id="team2" value="Team B"></label>
+    <div class="mode-section">
+        <h2>Select Mode</h2>
+        <label>
+            <select id="mode" onchange="changeMode()">
+                <option value="tournament">Tournament Mode</option>
+                <option value="individual">Individual Team Mode</option>
+            </select>
+        </label>
+    </div>
+
+    <div id="teamSection">
+        <h2>Team Details</h2>
+        <label>Team 1 Name: <input type="text" id="team1" value="Team A"></label>
+        <label id="team2Field">Team 2 Name: <input type="text" id="team2" value="Team B"></label>
+    </div>
 
     <h2>Player Details</h2>
     <label>Batsman on Strike: <input type="text" id="batsman1"></label>
@@ -69,6 +85,22 @@ let team1Name = document.getElementById("team1").value;
 let team2Name = document.getElementById("team2").value;
 let teamBatting = team1Name;
 
+function changeMode() {
+    let mode = document.getElementById("mode").value;
+    let team2Field = document.getElementById("team2Field");
+
+    if(mode === "individual") {
+        team2Field.style.display = "none"; // hide team 2
+        teamBatting = document.getElementById("team1").value;
+    } else {
+        team2Field.style.display = "block"; // show team 2
+        team1Name = document.getElementById("team1").value;
+        team2Name = document.getElementById("team2").value;
+        teamBatting = team1Name;
+    }
+    updateStats();
+}
+
 function addBall() {
     let runs = parseInt(document.getElementById("runs").value);
     let extra = document.getElementById("extra").value;
@@ -111,8 +143,11 @@ function updateStats() {
 }
 
 function switchSides() {
-    if(teamBatting === team1Name) teamBatting = team2Name;
-    else teamBatting = team1Name;
+    if(teamBatting === team1Name && document.getElementById("mode").value === "tournament") {
+        teamBatting = team2Name;
+    } else {
+        teamBatting = team1Name;
+    }
 
     // Reset stats for new innings
     teamRuns = 0;
