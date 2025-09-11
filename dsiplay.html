@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -24,6 +24,35 @@
       max-width: 600px;
       box-shadow: 0 0 10px rgba(131,132,212,0.3);
     }
+    .extras {
+      margin-top: 10px;
+      font-size: 0.9em;
+      color: #aaa;
+    }
+    .commentary {
+      margin-top: 20px;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+      background: #2a2a2a;
+      padding: 15px;
+      border-radius: 10px;
+      text-align: left;
+      font-size: 0.9em;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+    .comment {
+      background: #333;
+      padding: 8px;
+      margin-bottom: 6px;
+      border-radius: 6px;
+      animation: fadeIn 0.5s ease;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
   </style>
 </head>
 <body>
@@ -31,19 +60,42 @@
   <h1>🏏 Live Scoreboard</h1>
   <div class="score" id="score"></div>
 
+  <div class="commentary">
+    <h3>Ball-by-Ball Commentary</h3>
+    <div id="comments"></div>
+  </div>
+
   <script>
+    let lastEventId = null;
+
     function render() {
       let matchData = JSON.parse(localStorage.getItem("matchData")) || {};
       let t1 = matchData.team1 || "Team 1";
       let t2 = matchData.team2 || "Team 2";
-      let sc1 = matchData.score?.team1 || {runs:0,wickets:0,overs:0};
-      let sc2 = matchData.score?.team2 || {runs:0,wickets:0,overs:0};
+      let sc1 = matchData.score?.team1 || {runs:0,wickets:0,overs:0,balls:0};
+      let sc2 = matchData.score?.team2 || {runs:0,wickets:0,overs:0,balls:0};
+      let striker = matchData.striker || "-";
+      let nonStriker = matchData.nonStriker || "-";
+      let bowler = matchData.bowler || "-";
 
       document.getElementById("score").innerHTML = `
-        <h2>${t1}: ${sc1.runs}/${sc1.wickets} (${sc1.overs.toFixed(1)} ov)</h2>
-        <h2>${t2}: ${sc2.runs}/${sc2.wickets} (${sc2.overs.toFixed(1)} ov)</h2>
+        <h2>${t1}: ${sc1.runs}/${sc1.wickets} (${sc1.overs}.${sc1.balls})</h2>
+        <h2>${t2}: ${sc2.runs}/${sc2.wickets} (${sc2.overs}.${sc2.balls})</h2>
+        <p>Striker: ${striker} | Non-Striker: ${nonStriker}</p>
+        <p>Bowler: ${bowler}</p>
       `;
+
+      // Show commentary log
+      if (matchData.lastEvent && matchData.lastEvent.id !== lastEventId) {
+        lastEventId = matchData.lastEvent.id;
+        let commentBox = document.getElementById("comments");
+        let div = document.createElement("div");
+        div.className = "comment";
+        div.innerText = matchData.lastEvent.text;
+        commentBox.prepend(div);
+      }
     }
+
     render();
     setInterval(render, 2000); // refresh every 2s
   </script>
