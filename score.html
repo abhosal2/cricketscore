@@ -2,249 +2,114 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Scorer Panel</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background-color: #121212;
+      background-color: #1c1c1c;
       color: white;
-      margin: 0;
-      padding: 20px;
-    }
-    h1 {
+      font-family: Arial, sans-serif;
       text-align: center;
-      color: #8384D4;
     }
-    .scoreboard, .controls {
-      max-width: 800px;
+    .scoreboard {
       margin: 20px auto;
       padding: 20px;
-      background-color: #1E1E1E;
+      background: #2a2a2a;
       border-radius: 10px;
-      box-shadow: 0 0 10px rgba(131, 132, 212, 0.3);
+      width: 400px;
     }
     button {
-      padding: 10px 15px;
       margin: 5px;
+      padding: 10px;
+      background: #8384D4;
+      color: white;
       border: none;
       border-radius: 5px;
       cursor: pointer;
-      background: #8384D4;
-      color: white;
-      font-weight: bold;
     }
     button:hover {
-      background: #6a6bd1;
-    }
-    select {
-      padding: 8px;
-      margin: 5px 0;
-      width: 100%;
-      border-radius: 5px;
-      border: none;
-    }
-    .mode-toggle {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .disabled {
-      opacity: 0.5;
-      pointer-events: none;
+      background: #6a6bcc;
     }
   </style>
 </head>
 <body>
-
   <h1>🏏 Scorer Panel</h1>
+  <div class="scoreboard">
+    <h2 id="teamName">RCC</h2>
+    <p id="score">0/0 (0.0)</p>
+    <p>Striker: <span id="striker">-</span> | Non-Striker: <span id="nonstriker">-</span></p>
+    <p>Bowler: <span id="bowler">-</span></p>
 
-  <div class="mode-toggle">
-    <button onclick="switchMode('simple')">Simple Mode</button>
-    <button onclick="switchMode('full')">Full Mode</button>
+    <div>
+      <button onclick="addRuns(0)">0</button>
+      <button onclick="addRuns(1)">1</button>
+      <button onclick="addRuns(2)">2</button>
+      <button onclick="addRuns(3)">3</button>
+      <button onclick="addRuns(4)">4</button>
+      <button onclick="addRuns(6)">6</button>
+    </div>
+    <div>
+      <button onclick="addExtra('wd')">Wide</button>
+      <button onclick="addExtra('nb')">No Ball</button>
+    </div>
+    <div>
+      <button onclick="wicket()">Wicket</button>
+    </div>
   </div>
 
-  <!-- Scoreboard -->
-  <div class="scoreboard" id="scoreboard"></div>
-
-  <!-- Controls -->
-  <div class="controls" id="controls"></div>
-
   <script>
-    let matchData = JSON.parse(localStorage.getItem("matchData")) || {
-      team1: "Team 1", team2: "Team 2",
-      score: { team1: {runs:0,wickets:0,overs:0,balls:0}, team2: {runs:0,wickets:0,overs:0,balls:0} }
-    };
-    let battingTeam = "team1";
-    let mode = "simple";
-    let striker = null, nonStriker = null, bowler = null, lastBowler = null;
-    let awaitingNewStriker = false;
-    let awaitingNewBowler = false;
+    let runs = 0;
+    let wickets = 0;
+    let overs = 0;
+    let balls = 0;
+    let striker = "Aryan";
+    let nonStriker = "Soham";
+    let bowler = "Aayush";
 
-    function save() {
-      localStorage.setItem("matchData", JSON.stringify(matchData));
-      render();
+    function updateDisplay() {
+      document.getElementById("score").innerText = `${runs}/${wickets} (${overs}.${balls})`;
+      document.getElementById("striker").innerText = striker;
+      document.getElementById("nonstriker").innerText = nonStriker;
+      document.getElementById("bowler").innerText = bowler;
     }
 
-    function switchMode(m) {
-      mode = m;
-      render();
-    }
-
-    function updateScore(runs, wicket=false, extra=null) {
-      if (awaitingNewStriker || awaitingNewBowler) return; // block play
-
-      let t = matchData.score[battingTeam];
-      t.runs += runs;
-
-      if (wicket) {
-        t.wickets++;
-        awaitingNewStriker = true;
+    function addRuns(r) {
+      runs += r;
+      balls++;
+      if (balls >= 6) {
+        overs++;
+        balls = 0;
+        alert("Over completed! Please change bowler.");
       }
-
-      if (!extra) { 
-        t.balls++;
-        if (t.balls >= 6) {
-          t.overs++;
-          t.balls = 0;
-          awaitingNewBowler = true;
-          lastBowler = bowler;
-          bowler = null;
-        }
-      }
-
-      // strike rotation
-      if (!wicket && !extra && runs % 2 !== 0) {
+      if (r % 2 !== 0) {
         [striker, nonStriker] = [nonStriker, striker];
       }
-
-      save();
+      updateDisplay();
     }
 
-    function chooseStriker(newPlayer) {
-      striker = newPlayer;
-      awaitingNewStriker = false;
-      save();
-    }
-
-    function chooseNonStriker(newPlayer) {
-      nonStriker = newPlayer;
-      save();
-    }
-
-    function chooseBowler(newBowler) {
-      if (newBowler === lastBowler) {
-        alert("❌ Same bowler cannot bowl consecutive overs!");
-        return;
+    function addExtra(type) {
+      runs++;
+      if (type === "wd") {
+        alert("Wide ball!");
+      } else if (type === "nb") {
+        alert("No ball!");
       }
-      bowler = newBowler;
-      awaitingNewBowler = false;
-      save();
+      // no ball or wide doesn't increase ball count
+      updateDisplay();
     }
 
-    function changeInnings() {
-      battingTeam = (battingTeam === "team1") ? "team2" : "team1";
-      striker = nonStriker = bowler = lastBowler = null;
-      matchData.score[battingTeam].balls = 0;
-      save();
-    }
-
-    function render() {
-      let sb = document.getElementById("scoreboard");
-      let c = document.getElementById("controls");
-      let t1 = matchData.team1, t2 = matchData.team2;
-      let sc1 = matchData.score.team1;
-      let sc2 = matchData.score.team2;
-
-      sb.innerHTML = `
-        <h2>${t1}: ${sc1.runs}/${sc1.wickets} (${sc1.overs}.${sc1.balls})</h2>
-        <h2>${t2}: ${sc2.runs}/${sc2.wickets} (${sc2.overs}.${sc2.balls})</h2>
-        <p>Currently batting: ${(battingTeam==="team1"?t1:t2)}</p>
-        <p>Striker: ${striker || "-"} | Non-Striker: ${nonStriker || "-"}</p>
-        <p>Bowler: ${bowler || "-"}</p>
-      `;
-
-      if (mode === "simple") {
-        c.innerHTML = `
-          <h3>Simple Controls</h3>
-          <button onclick="updateScore(1)">+1 Run</button>
-          <button onclick="updateScore(4)">+4</button>
-          <button onclick="updateScore(6)">+6</button>
-          <button onclick="updateScore(0,true)">Wicket</button>
-          <button onclick="updateScore(1,null,'wide')">Wide +1</button>
-          <button onclick="updateScore(1,null,'noball')">No Ball +1</button>
-          <button onclick="changeInnings()">Change Innings</button>
-        `;
-      } else {
-        if (awaitingNewStriker) {
-          c.innerHTML = `
-            <h3>New Striker Required</h3>
-            <select onchange="chooseStriker(this.value)">
-              <option value="">-- Select Striker --</option>
-              ${(matchData[battingTeam+'Players']||[]).map(p=>`<option>${p}</option>`).join("")}
-            </select>
-          `;
-          return;
-        }
-        if (awaitingNewBowler) {
-          c.innerHTML = `
-            <h3>New Bowler Required</h3>
-            <select onchange="chooseBowler(this.value)">
-              <option value="">-- Select Bowler --</option>
-              ${(matchData[(battingTeam==='team1'?'team2':'team1')+'Players']||[]).map(p=>`<option>${p}</option>`).join("")}
-            </select>
-          `;
-          return;
-        }
-
-        c.innerHTML = `
-          <h3>Full Controls</h3>
-          <label>Striker</label>
-          <select onchange="chooseStriker(this.value)">
-            <option value="">-- Select Striker --</option>
-            ${(matchData[battingTeam+'Players']||[]).map(p=>`<option ${p===striker?"selected":""}>${p}</option>`).join("")}
-          </select>
-
-          <label>Non-Striker</label>
-          <select onchange="chooseNonStriker(this.value)">
-            <option value="">-- Select Non-Striker --</option>
-            ${(matchData[battingTeam+'Players']||[]).map(p=>`<option ${p===nonStriker?"selected":""}>${p}</option>`).join("")}
-          </select>
-
-          <label>Bowler</label>
-          <select onchange="chooseBowler(this.value)">
-            <option value="">-- Select Bowler --</option>
-            ${(matchData[(battingTeam==='team1'?'team2':'team1')+'Players']||[]).map(p=>`<option ${p===bowler?"selected":""}>${p}</option>`).join("")}
-          </select>
-
-          <h4>Runs</h4>
-          <button onclick="updateScore(0,true)">Wicket</button>
-          <button onclick="updateScore(1)">1</button>
-          <button onclick="updateScore(2)">2</button>
-          <button onclick="updateScore(3)">3</button>
-          <button onclick="updateScore(4)">4</button>
-          <button onclick="updateScore(6)">6</button>
-
-          <h4>Extras</h4>
-          <button onclick="updateScore(1,null,'wide')">1WD</button>
-          <button onclick="updateScore(2,null,'wide')">2WD</button>
-          <button onclick="updateScore(3,null,'wide')">3WD</button>
-          <button onclick="updateScore(4,null,'wide')">4WD</button>
-          <button onclick="updateScore(6,null,'wide')">6WD</button>
-
-          <button onclick="updateScore(1,null,'noball')">1NB</button>
-          <button onclick="updateScore(2,null,'noball')">2NB</button>
-          <button onclick="updateScore(3,null,'noball')">3NB</button>
-          <button onclick="updateScore(4,null,'noball')">4NB</button>
-          <button onclick="updateScore(6,null,'noball')">6NB</button>
-
-          <button onclick="updateScore(0,null,'legbye')">Leg Bye</button>
-          <br><br>
-          <button onclick="changeInnings()">Change Innings</button>
-        `;
+    function wicket() {
+      wickets++;
+      balls++;
+      if (balls >= 6) {
+        overs++;
+        balls = 0;
+        alert("Over completed! Please change bowler.");
       }
+      alert("Wicket fallen! Please choose next batsman.");
+      updateDisplay();
     }
 
-    render();
+    updateDisplay();
   </script>
 </body>
 </html>
