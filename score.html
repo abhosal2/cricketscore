@@ -2,43 +2,58 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Scorer Panel</title>
+  <title>Cricket Score Management</title>
   <style>
     body {
-      background-color: #1c1c1c;
-      color: white;
       font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: white;
       text-align: center;
-    }
-    .scoreboard {
-      margin: 20px auto;
       padding: 20px;
-      background: #2a2a2a;
+    }
+    .scoreboard, .controls {
+      background: #1e1e2f;
+      padding: 20px;
+      margin: 20px auto;
       border-radius: 10px;
-      width: 450px;
+      width: 80%;
+      max-width: 800px;
+      box-shadow: 0px 0px 10px #8384D4;
+    }
+    h1, h2 {
+      color: #8384D4;
     }
     button {
       margin: 5px;
       padding: 10px 15px;
+      border: none;
+      border-radius: 6px;
       background: #8384D4;
       color: white;
-      border: none;
-      border-radius: 5px;
+      font-size: 14px;
       cursor: pointer;
     }
     button:hover {
-      background: #6a6bcc;
+      background: #6a6bc0;
+    }
+    .footer-btn {
+      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>🏏 Scorer Panel</h1>
-  <div class="scoreboard">
-    <h2 id="teamName">RCC</h2>
-    <p id="score">0/0 (0.0)</p>
-    <p>Striker: <span id="striker">-</span> | Non-Striker: <span id="nonstriker">-</span></p>
-    <p>Bowler: <span id="bowler">-</span></p>
+  <h1>Cricket Score Manager</h1>
 
+  <div class="scoreboard">
+    <h2 id="teamName">Team A</h2>
+    <p id="teamScore">Score: 0/0 (0.0 overs)</p>
+    <p id="currentBatting">Currently batting: None</p>
+    <p id="currentPlayers">Striker: None | Non-Striker: None</p>
+    <p id="currentBowler">Bowler: None</p>
+  </div>
+
+  <div class="controls">
+    <h3>Scoring</h3>
     <div>
       <button onclick="addRuns(0)">0</button>
       <button onclick="addRuns(1)">1</button>
@@ -47,88 +62,110 @@
       <button onclick="addRuns(4)">4</button>
       <button onclick="addRuns(6)">6</button>
     </div>
+
+    <h3>Extras</h3>
     <div>
-      <button onclick="addExtra('wd')">Wide</button>
-      <button onclick="addExtra('nb')">No Ball</button>
+      <button onclick="addExtra('wd',1)">1WD</button>
+      <button onclick="addExtra('wd',2)">2WD</button>
+      <button onclick="addExtra('wd',3)">3WD</button>
+      <button onclick="addExtra('wd',4)">4WD</button>
+      <button onclick="addExtra('wd',6)">6WD</button>
+      <button onclick="addExtra('nb',1)">1NB</button>
+      <button onclick="addExtra('nb',2)">2NB</button>
+      <button onclick="addExtra('nb',3)">3NB</button>
+      <button onclick="addExtra('nb',4)">4NB</button>
+      <button onclick="addExtra('nb',6)">6NB</button>
+      <button onclick="addExtra('lb',1)">1LB</button>
+      <button onclick="addExtra('lb',2)">2LB</button>
+      <button onclick="addExtra('lb',3)">3LB</button>
+      <button onclick="addExtra('lb',4)">4LB</button>
     </div>
-    <div>
-      <button onclick="wicket()">Wicket</button>
-    </div>
-    <div>
-      <button onclick="changeBatsman()">Change Batsman</button>
-      <button onclick="changeBowler()">Change Bowler</button>
-    </div>
+
+    <h3>Wicket</h3>
+    <button onclick="fallOfWicket()">Wicket</button>
+
+    <h3>Set Players</h3>
+    <input type="text" id="strikerInput" placeholder="Striker Name">
+    <input type="text" id="nonStrikerInput" placeholder="Non-Striker Name">
+    <input type="text" id="bowlerInput" placeholder="Bowler Name">
+    <button onclick="setPlayers()">Set Players</button>
+
+    <h3>Over Control</h3>
+    <button onclick="endOver()">End Over (Choose Next Bowler)</button>
+
+    <h3>Match Control</h3>
+    <button onclick="resetMatch()">Reset Match</button>
+  </div>
+
+  <div class="footer-btn">
+    <button onclick="window.location.href='display.html'">Go to Display</button>
   </div>
 
   <script>
-    let runs = 0;
-    let wickets = 0;
-    let overs = 0;
-    let balls = 0;
-    let striker = "Aryan";
-    let nonStriker = "Soham";
-    let bowler = "Aayush";
-    let teamName = "RCC";
+    let score = 0, wickets = 0, balls = 0, overs = 0, striker = "None", nonStriker = "None", bowler = "None", team = "Team A";
 
-    function updateDisplay(commentary = "") {
-      const scoreText = `${runs}/${wickets} (${overs}.${balls})`;
-      document.getElementById("score").innerText = scoreText;
-      document.getElementById("striker").innerText = striker;
-      document.getElementById("nonstriker").innerText = nonStriker;
-      document.getElementById("bowler").innerText = bowler;
+    function updateDisplay() {
+      document.getElementById("teamScore").innerText = `Score: ${score}/${wickets} (${overs}.${balls} overs)`;
+      document.getElementById("currentBatting").innerText = `Currently batting: ${team}`;
+      document.getElementById("currentPlayers").innerText = `Striker: ${striker} | Non-Striker: ${nonStriker}`;
+      document.getElementById("currentBowler").innerText = `Bowler: ${bowler}`;
 
-      // Save for display.html
       localStorage.setItem("scoreData", JSON.stringify({
-        teamName, runs, wickets, overs, balls,
-        striker, nonStriker, bowler, commentary
+        score, wickets, overs, balls, striker, nonStriker, bowler, team
       }));
     }
 
-    function addRuns(r) {
-      runs += r;
+    function addRuns(runs) {
+      score += runs;
       balls++;
       if (balls >= 6) {
         overs++;
         balls = 0;
-        alert("Over completed! Please change bowler.");
+        alert("Over completed. Please select next bowler.");
       }
-      if (r % 2 !== 0) {
-        [striker, nonStriker] = [nonStriker, striker];
-      }
-      updateDisplay(`${r} run(s) scored`);
+      if (runs % 2 !== 0) [striker, nonStriker] = [nonStriker, striker];
+      updateDisplay();
     }
 
-    function addExtra(type) {
-      runs++;
-      if (type === "wd") {
-        updateDisplay("Wide ball! +1 run");
-      } else if (type === "nb") {
-        updateDisplay("No ball! +1 run");
+    function addExtra(type, runs) {
+      score += runs;
+      if (type === "lb") {
+        balls++;
+        if (balls >= 6) {
+          overs++;
+          balls = 0;
+          alert("Over completed. Please select next bowler.");
+        }
       }
-      // extras don't increase balls
+      updateDisplay();
     }
 
-    function wicket() {
+    function fallOfWicket() {
       wickets++;
-      balls++;
-      if (balls >= 6) {
-        overs++;
-        balls = 0;
-        alert("Over completed! Please change bowler.");
-      }
-      updateDisplay("Wicket! New batsman required.");
+      striker = "Choose new striker";
+      updateDisplay();
+      alert("Wicket fallen! Please set new striker before continuing.");
     }
 
-    function changeBatsman() {
-      const newBatsman = prompt("Enter new striker's name:");
-      if (newBatsman) striker = newBatsman;
-      updateDisplay("New batsman on strike");
+    function setPlayers() {
+      if (document.getElementById("strikerInput").value) striker = document.getElementById("strikerInput").value;
+      if (document.getElementById("nonStrikerInput").value) nonStriker = document.getElementById("nonStrikerInput").value;
+      if (document.getElementById("bowlerInput").value) bowler = document.getElementById("bowlerInput").value;
+      updateDisplay();
     }
 
-    function changeBowler() {
-      const newBowler = prompt("Enter bowler's name:");
-      if (newBowler) bowler = newBowler;
-      updateDisplay("New bowler starts the over");
+    function endOver() {
+      [striker, nonStriker] = [nonStriker, striker];
+      bowler = "Choose new bowler";
+      updateDisplay();
+      alert("Over ended! Please choose a new bowler.");
+    }
+
+    function resetMatch() {
+      score = 0; wickets = 0; balls = 0; overs = 0;
+      striker = "None"; nonStriker = "None"; bowler = "None"; team = "Team A";
+      updateDisplay();
+      alert("Match reset!");
     }
 
     updateDisplay();
