@@ -7,12 +7,13 @@
     body {
       font-family: Arial, sans-serif;
       text-align: center;
-      background: #0F2447;
-      color: white;
       margin: 0;
       padding: 50px;
+      color: white;
       overflow: hidden;
       position: relative;
+      height: 100vh;
+      background: #0F2447;
     }
 
     h1 {
@@ -50,7 +51,7 @@
       background: #6a6bc0;
     }
 
-    /* Peacemaker-style glowing wall background */
+    /* Cinematic Peacemaker-style wall */
     .wall {
       position: fixed;
       top: 0;
@@ -58,54 +59,44 @@
       width: 100%;
       height: 100%;
       display: grid;
-      grid-template-columns: repeat(6, 120px);
+      grid-template-columns: repeat(auto-fill, 120px);
       grid-auto-rows: 120px;
       grid-gap: 15px;
       pointer-events: none;
       z-index: 0;
       padding: 20px;
       box-sizing: border-box;
-      overflow: hidden;
     }
 
     .panel {
       background: #111;
       border: 2px solid rgba(255, 255, 255, 0.05);
-      box-shadow: 
-        0 0 15px rgba(0, 255, 255, 0.4), 
-        inset 0 0 15px rgba(0, 255, 255, 0.2);
-      transition: 0.3s;
-      animation: glowPulse 2s infinite alternate;
+      box-shadow: 0 0 15px rgba(0, 255, 255, 0.4), inset 0 0 15px rgba(0, 255, 255, 0.2);
+      animation: glowWave 3s infinite;
     }
 
-    .panel:hover {
-      box-shadow: 
-        0 0 25px rgba(0, 255, 255, 0.8), 
-        inset 0 0 20px rgba(0, 255, 255, 0.5);
-    }
+    /* Multiple colors for panels */
+    .panel:nth-child(3n) { --color: #0ff; }
+    .panel:nth-child(3n+1) { --color: #ff0fff; }
+    .panel:nth-child(3n+2) { --color: #9b59b6; }
 
-    /* Glowing pulse animation */
-    @keyframes glowPulse {
-      0% {
-        box-shadow: 
-          0 0 10px rgba(0, 255, 255, 0.3),
-          inset 0 0 10px rgba(0, 255, 255, 0.1);
+    @keyframes glowWave {
+      0%, 100% {
+        box-shadow:
+          0 0 10px var(--color, #0ff),
+          inset 0 0 10px rgba(0,255,255,0.1);
       }
       50% {
-        box-shadow: 
-          0 0 25px rgba(0, 255, 255, 0.6),
-          inset 0 0 20px rgba(0, 255, 255, 0.3);
-      }
-      100% {
-        box-shadow: 
-          0 0 15px rgba(0, 255, 255, 0.4),
-          inset 0 0 15px rgba(0, 255, 255, 0.2);
+        box-shadow:
+          0 0 35px var(--color, #0ff),
+          inset 0 0 20px rgba(0,255,255,0.3);
       }
     }
   </style>
 </head>
 <body>
-  <!-- Glowing wall background -->
+
+  <!-- Cinematic glowing wall -->
   <div class="wall" id="wall"></div>
 
   <!-- Original page content -->
@@ -117,26 +108,24 @@
   </div>
 
   <script>
-    // Dynamically fill the wall with panels
     const wall = document.getElementById('wall');
-    const cols = 6;
-    const rows = Math.ceil(window.innerHeight / 135); // 120px + 15px gap
-    for(let i = 0; i < cols * rows; i++){
-      const panel = document.createElement('div');
-      panel.className = 'panel';
-      wall.appendChild(panel);
-    }
 
-    // Resize wall dynamically on window resize
-    window.addEventListener('resize', () => {
+    function createPanels() {
       wall.innerHTML = '';
-      const rows = Math.ceil(window.innerHeight / 135);
-      for(let i = 0; i < cols * rows; i++){
+      const panelSize = 135; // 120px + 15px gap
+      const cols = Math.ceil(window.innerWidth / panelSize);
+      const rows = Math.ceil(window.innerHeight / panelSize);
+      const total = cols * rows;
+      for(let i = 0; i < total; i++){
         const panel = document.createElement('div');
         panel.className = 'panel';
+        panel.style.animationDelay = (i * 0.1) + 's'; // wave effect
         wall.appendChild(panel);
       }
-    });
+    }
+
+    createPanels();
+    window.addEventListener('resize', createPanels);
   </script>
 </body>
 </html>
