@@ -20,9 +20,12 @@
       max-width: 800px;
       box-shadow: 0px 0px 10px #8384D4;
     }
-    h1, h2 {
-      color: #8384D4;
+    h1, h2, h3 {
+      font-family: "Copperplate Gothic Light", "Copperplate", Arial, sans-serif;
     }
+    h1 { font-size: 22px; color: #8384D4; }
+    h2 { font-size: 20px; color: #ffffff; }
+    h3 { font-size: 18px; color: #8384D4; margin-top: 20px; }
     button {
       margin: 5px;
       padding: 10px 15px;
@@ -36,16 +39,23 @@
     button:hover {
       background: #6a6bc0;
     }
+    select, input {
+      margin: 5px;
+      padding: 8px;
+      border-radius: 6px;
+      border: none;
+      font-size: 14px;
+    }
     .footer-btn {
       margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>Cricket Score Manager</h1>
+  <h1>🏏 Cricket Score Manager</h1>
 
   <div class="scoreboard">
-    <h2 id="teamName">Team A</h2>
+    <h2 id="teamName">Team</h2>
     <p id="teamScore">Score: 0/0 (0.0 overs)</p>
     <p id="currentBatting">Currently batting: None</p>
     <p id="currentPlayers">Striker: None | Non-Striker: None</p>
@@ -85,15 +95,16 @@
     <button onclick="fallOfWicket()">Wicket</button>
 
     <h3>Set Players</h3>
-    <input type="text" id="strikerInput" placeholder="Striker Name">
-    <input type="text" id="nonStrikerInput" placeholder="Non-Striker Name">
-    <input type="text" id="bowlerInput" placeholder="Bowler Name">
+    <select id="strikerSelect"><option value="">Select Striker</option></select>
+    <select id="nonStrikerSelect"><option value="">Select Non-Striker</option></select>
+    <select id="bowlerSelect"><option value="">Select Bowler</option></select>
     <button onclick="setPlayers()">Set Players</button>
 
     <h3>Over Control</h3>
     <button onclick="endOver()">End Over (Choose Next Bowler)</button>
 
     <h3>Match Control</h3>
+    <button onclick="endInnings()">End Innings</button>
     <button onclick="resetMatch()">Reset Match</button>
   </div>
 
@@ -102,16 +113,49 @@
   </div>
 
   <script>
-    let score = 0, wickets = 0, balls = 0, overs = 0, striker = "None", nonStriker = "None", bowler = "None", team = "Team A";
+    let score = 0, wickets = 0, balls = 0, overs = 0;
+    let striker = "None", nonStriker = "None", bowler = "None";
+    let battingTeam = null, bowlingTeam = null;
+    let tournamentData = JSON.parse(localStorage.getItem("tournamentData"));
+
+    function loadTeams() {
+      if (tournamentData) {
+        battingTeam = tournamentData.team1;
+        bowlingTeam = tournamentData.team2;
+        document.getElementById("teamName").innerText = battingTeam.name;
+
+        populateDropdown("strikerSelect", battingTeam.players);
+        populateDropdown("nonStrikerSelect", battingTeam.players);
+        populateDropdown("bowlerSelect", bowlingTeam.players);
+      } else {
+        battingTeam = { name: "Team A", players: [] };
+        bowlingTeam = { name: "Team B", players: [] };
+      }
+      updateDisplay();
+    }
+
+    function populateDropdown(id, players) {
+      let dropdown = document.getElementById(id);
+      dropdown.innerHTML = "<option value=''>Select</option>";
+      players.forEach(p => {
+        if (p.trim()) {
+          let option = document.createElement("option");
+          option.value = p;
+          option.text = p;
+          dropdown.add(option);
+        }
+      });
+    }
 
     function updateDisplay() {
       document.getElementById("teamScore").innerText = `Score: ${score}/${wickets} (${overs}.${balls} overs)`;
-      document.getElementById("currentBatting").innerText = `Currently batting: ${team}`;
+      document.getElementById("currentBatting").innerText = `Currently batting: ${battingTeam ? battingTeam.name : "None"}`;
       document.getElementById("currentPlayers").innerText = `Striker: ${striker} | Non-Striker: ${nonStriker}`;
       document.getElementById("currentBowler").innerText = `Bowler: ${bowler}`;
 
       localStorage.setItem("scoreData", JSON.stringify({
-        score, wickets, overs, balls, striker, nonStriker, bowler, team
+        score, wickets, overs, balls, striker, nonStriker, bowler,
+        team: battingTeam ? battingTeam.name : "Team"
       }));
     }
 
@@ -148,9 +192,9 @@
     }
 
     function setPlayers() {
-      if (document.getElementById("strikerInput").value) striker = document.getElementById("strikerInput").value;
-      if (document.getElementById("nonStrikerInput").value) nonStriker = document.getElementById("nonStrikerInput").value;
-      if (document.getElementById("bowlerInput").value) bowler = document.getElementById("bowlerInput").value;
+      if (document.getElementById("strikerSelect").value) striker = document.getElementById("strikerSelect").value;
+      if (document.getElementById("nonStrikerSelect").value) nonStriker = document.getElementById("nonStrikerSelect").value;
+      if (document.getElementById("bowlerSelect").value) bowler = document.getElementById("bowlerSelect").value;
       updateDisplay();
     }
 
@@ -159,16 +203,30 @@
       bowler = "Choose new bowler";
       updateDisplay();
       alert("Over ended! Please choose a new bowler.");
+      populateDropdown("bowlerSelect", bowlingTeam.players);
+    }
+
+    function endInnings() {
+      // Swap batting and bowling teams
+      [battingTeam, bowlingTeam] = [bowlingTeam, battingTeam];
+      score = 0; wickets = 0; balls = 0; overs = 0;
+      striker = "None"; nonStriker = "None"; bowler = "None";
+      alert("Innings ended! Now " + battingTeam.name + " is batting.");
+      document.getElementById("teamName").innerText = battingTeam.name;
+      populateDropdown("strikerSelect", battingTeam.players);
+      populateDropdown("nonStrikerSelect", battingTeam.players);
+      populateDropdown("bowlerSelect", bowlingTeam.players);
+      updateDisplay();
     }
 
     function resetMatch() {
       score = 0; wickets = 0; balls = 0; overs = 0;
-      striker = "None"; nonStriker = "None"; bowler = "None"; team = "Team A";
-      updateDisplay();
+      striker = "None"; nonStriker = "None"; bowler = "None";
+      loadTeams();
       alert("Match reset!");
     }
 
-    updateDisplay();
+    loadTeams();
   </script>
 </body>
 </html>
