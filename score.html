@@ -15,11 +15,11 @@
       padding: 20px;
       background: #2a2a2a;
       border-radius: 10px;
-      width: 400px;
+      width: 450px;
     }
     button {
       margin: 5px;
-      padding: 10px;
+      padding: 10px 15px;
       background: #8384D4;
       color: white;
       border: none;
@@ -54,6 +54,10 @@
     <div>
       <button onclick="wicket()">Wicket</button>
     </div>
+    <div>
+      <button onclick="changeBatsman()">Change Batsman</button>
+      <button onclick="changeBowler()">Change Bowler</button>
+    </div>
   </div>
 
   <script>
@@ -64,12 +68,20 @@
     let striker = "Aryan";
     let nonStriker = "Soham";
     let bowler = "Aayush";
+    let teamName = "RCC";
 
-    function updateDisplay() {
-      document.getElementById("score").innerText = `${runs}/${wickets} (${overs}.${balls})`;
+    function updateDisplay(commentary = "") {
+      const scoreText = `${runs}/${wickets} (${overs}.${balls})`;
+      document.getElementById("score").innerText = scoreText;
       document.getElementById("striker").innerText = striker;
       document.getElementById("nonstriker").innerText = nonStriker;
       document.getElementById("bowler").innerText = bowler;
+
+      // Save for display.html
+      localStorage.setItem("scoreData", JSON.stringify({
+        teamName, runs, wickets, overs, balls,
+        striker, nonStriker, bowler, commentary
+      }));
     }
 
     function addRuns(r) {
@@ -83,18 +95,17 @@
       if (r % 2 !== 0) {
         [striker, nonStriker] = [nonStriker, striker];
       }
-      updateDisplay();
+      updateDisplay(`${r} run(s) scored`);
     }
 
     function addExtra(type) {
       runs++;
       if (type === "wd") {
-        alert("Wide ball!");
+        updateDisplay("Wide ball! +1 run");
       } else if (type === "nb") {
-        alert("No ball!");
+        updateDisplay("No ball! +1 run");
       }
-      // no ball or wide doesn't increase ball count
-      updateDisplay();
+      // extras don't increase balls
     }
 
     function wicket() {
@@ -105,8 +116,19 @@
         balls = 0;
         alert("Over completed! Please change bowler.");
       }
-      alert("Wicket fallen! Please choose next batsman.");
-      updateDisplay();
+      updateDisplay("Wicket! New batsman required.");
+    }
+
+    function changeBatsman() {
+      const newBatsman = prompt("Enter new striker's name:");
+      if (newBatsman) striker = newBatsman;
+      updateDisplay("New batsman on strike");
+    }
+
+    function changeBowler() {
+      const newBowler = prompt("Enter bowler's name:");
+      if (newBowler) bowler = newBowler;
+      updateDisplay("New bowler starts the over");
     }
 
     updateDisplay();
