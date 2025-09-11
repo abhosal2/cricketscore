@@ -1,0 +1,52 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Scoreboard</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: white;
+      text-align: center;
+      padding: 20px;
+    }
+    h1 {
+      color: #8384D4;
+    }
+    .score {
+      margin: 20px auto;
+      padding: 20px;
+      background: #1E1E1E;
+      border-radius: 10px;
+      width: 90%;
+      max-width: 600px;
+      box-shadow: 0 0 10px rgba(131,132,212,0.3);
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🏏 Live Scoreboard</h1>
+  <div class="score" id="score"></div>
+
+  <script>
+    function render() {
+      let matchData = JSON.parse(localStorage.getItem("matchData")) || {};
+      let t1 = matchData.team1 || "Team 1";
+      let t2 = matchData.team2 || "Team 2";
+      let sc1 = matchData.score?.team1 || {runs:0,wickets:0,overs:0};
+      let sc2 = matchData.score?.team2 || {runs:0,wickets:0,overs:0};
+
+      document.getElementById("score").innerHTML = `
+        <h2>${t1}: ${sc1.runs}/${sc1.wickets} (${sc1.overs.toFixed(1)} ov)</h2>
+        <h2>${t2}: ${sc2.runs}/${sc2.wickets} (${sc2.overs.toFixed(1)} ov)</h2>
+      `;
+    }
+    render();
+    setInterval(render, 2000); // refresh every 2s
+  </script>
+
+</body>
+</html>

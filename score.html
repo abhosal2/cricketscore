@@ -1,0 +1,152 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Scorer Panel</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background-color: #121212;
+      color: white;
+      margin: 0;
+      padding: 20px;
+    }
+    h1 {
+      text-align: center;
+      color: #8384D4;
+    }
+    .scoreboard, .controls {
+      max-width: 800px;
+      margin: 20px auto;
+      padding: 20px;
+      background-color: #1E1E1E;
+      border-radius: 10px;
+      box-shadow: 0 0 10px rgba(131, 132, 212, 0.3);
+    }
+    button {
+      padding: 10px 15px;
+      margin: 5px;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      background: #8384D4;
+      color: white;
+      font-weight: bold;
+    }
+    button:hover {
+      background: #6a6bd1;
+    }
+    select, input {
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+      border-radius: 5px;
+      border: none;
+    }
+    .mode-toggle {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🏏 Scorer Panel</h1>
+
+  <div class="mode-toggle">
+    <button onclick="switchMode('simple')">Simple Mode</button>
+    <button onclick="switchMode('full')">Full Mode</button>
+  </div>
+
+  <!-- Scoreboard -->
+  <div class="scoreboard" id="scoreboard"></div>
+
+  <!-- Controls -->
+  <div class="controls" id="controls"></div>
+
+  <script>
+    let matchData = JSON.parse(localStorage.getItem("matchData")) || {};
+    let battingTeam = "team1";
+    let mode = "simple";
+
+    function save() {
+      localStorage.setItem("matchData", JSON.stringify(matchData));
+      render();
+    }
+
+    function switchMode(m) {
+      mode = m;
+      render();
+    }
+
+    function updateScore(runs, wicket=false, extra=null) {
+      let t = matchData.score[battingTeam];
+      if (runs) t.runs += runs;
+      if (wicket) t.wickets++;
+      if (extra === null) t.overs += 0.1; // legal ball
+      if (Math.round((t.overs % 1) * 10) >= 6) {
+        t.overs = Math.floor(t.overs) + 1;
+      }
+      save();
+    }
+
+    function changeInnings() {
+      battingTeam = (battingTeam === "team1") ? "team2" : "team1";
+      save();
+    }
+
+    function render() {
+      let sb = document.getElementById("scoreboard");
+      let c = document.getElementById("controls");
+      let t1 = matchData.team1 || "Team 1";
+      let t2 = matchData.team2 || "Team 2";
+      let sc1 = matchData.score?.team1 || {runs:0,wickets:0,overs:0};
+      let sc2 = matchData.score?.team2 || {runs:0,wickets:0,overs:0};
+
+      sb.innerHTML = `
+        <h2>${t1}: ${sc1.runs}/${sc1.wickets} (${sc1.overs.toFixed(1)} ov)</h2>
+        <h2>${t2}: ${sc2.runs}/${sc2.wickets} (${sc2.overs.toFixed(1)} ov)</h2>
+        <p>Currently batting: ${(battingTeam==="team1"?t1:t2)}</p>
+      `;
+
+      if (mode === "simple") {
+        c.innerHTML = `
+          <h3>Simple Controls</h3>
+          <button onclick="updateScore(1)">+1 Run</button>
+          <button onclick="updateScore(4)">+4</button>
+          <button onclick="updateScore(6)">+6</button>
+          <button onclick="updateScore(0,true)">Wicket</button>
+          <button onclick="updateScore(0,null,'wide')">Wide</button>
+          <button onclick="updateScore(0,null,'noball')">No Ball</button>
+          <button onclick="changeInnings()">Change Innings</button>
+        `;
+      } else {
+        c.innerHTML = `
+          <h3>Full Controls</h3>
+          <label>Select Striker</label>
+          <select id="striker">
+            ${(matchData[battingTeam+'Players']||[]).map(p=>`<option>${p}</option>`).join("")}
+          </select>
+          <label>Select Bowler</label>
+          <select id="bowler">
+            ${(matchData[(battingTeam==='team1'?'team2':'team1')+'Players']||[]).map(p=>`<option>${p}</option>`).join("")}
+          </select>
+          <button onclick="updateScore(1)">+1 Run</button>
+          <button onclick="updateScore(2)">+2</button>
+          <button onclick="updateScore(3)">+3</button>
+          <button onclick="updateScore(4)">+4</button>
+          <button onclick="updateScore(6)">+6</button>
+          <button onclick="updateScore(0,true)">Wicket</button>
+          <button onclick="updateScore(0,null,'wide')">Wide</button>
+          <button onclick="updateScore(0,null,'noball')">No Ball</button>
+          <button onclick="updateScore(0,null,'legbye')">Leg Bye</button>
+          <button onclick="changeInnings()">Change Innings</button>
+        `;
+      }
+    }
+
+    render();
+  </script>
+</body>
+</html>
