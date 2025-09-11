@@ -2,231 +2,126 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Cricket Score Management</title>
+  <title>Rockets Cricket Club</title>
   <style>
+    /* Body & Background */
     body {
       font-family: Arial, sans-serif;
-      background-color: #121212;
-      color: white;
       text-align: center;
-      padding: 20px;
+      margin: 0;
+      padding: 50px;
+      color: white;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: black; /* fallback */
     }
-    .scoreboard, .controls {
-      background: #1e1e2f;
+
+    /* Glowing Grid Background */
+    .wall {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(6, 120px);
+      grid-auto-rows: 120px;
+      grid-gap: 15px;
+      pointer-events: none; /* so it doesn't block buttons */
+      z-index: 0;
       padding: 20px;
-      margin: 20px auto;
-      border-radius: 10px;
-      width: 80%;
-      max-width: 800px;
-      box-shadow: 0px 0px 10px #8384D4;
+      box-sizing: border-box;
     }
-    h1, h2, h3 {
+
+    .panel {
+      background: #111;
+      border: 2px solid rgba(255, 255, 255, 0.05);
+      box-shadow: 
+        0 0 15px rgba(0, 255, 255, 0.4), 
+        inset 0 0 15px rgba(0, 255, 255, 0.2);
+      transition: 0.3s;
+    }
+
+    .panel:hover {
+      box-shadow: 
+        0 0 25px rgba(0, 255, 255, 0.8), 
+        inset 0 0 20px rgba(0, 255, 255, 0.5);
+    }
+
+    /* Foreground Content */
+    .content {
+      position: relative;
+      z-index: 1;
+      max-width: 900px;
+      width: 100%;
+    }
+
+    /* Original Styles */
+    h1 {
       font-family: "Copperplate Gothic Light", "Copperplate", Arial, sans-serif;
+      font-size: 36px;
+      color: #ffffff;
+      margin-bottom: 40px;
     }
-    h1 { font-size: 22px; color: #8384D4; }
-    h2 { font-size: 20px; color: #ffffff; }
-    h3 { font-size: 18px; color: #8384D4; margin-top: 20px; }
-    button {
-      margin: 5px;
-      padding: 10px 15px;
-      border: none;
-      border-radius: 6px;
+    .nav-links {
+      display: flex;
+      justify-content: center;
+      gap: 30px;
+      flex-wrap: wrap;
+    }
+    a {
+      display: inline-block;
+      padding: 15px 30px;
       background: #8384D4;
       color: white;
-      font-size: 14px;
-      cursor: pointer;
+      text-decoration: none;
+      border-radius: 10px;
+      font-size: 1.2em;
+      transition: background 0.3s;
     }
-    button:hover {
+    a:hover {
       background: #6a6bc0;
-    }
-    select, input {
-      margin: 5px;
-      padding: 8px;
-      border-radius: 6px;
-      border: none;
-      font-size: 14px;
-    }
-    .footer-btn {
-      margin-top: 20px;
     }
   </style>
 </head>
 <body>
-  <h1>🏏 Cricket Score Manager</h1>
+  <!-- Glowing grid background -->
+  <div class="wall" id="wall"></div>
 
-  <div class="scoreboard">
-    <h2 id="teamName">Team</h2>
-    <p id="teamScore">Score: 0/0 (0.0 overs)</p>
-    <p id="currentBatting">Currently batting: None</p>
-    <p id="currentPlayers">Striker: None | Non-Striker: None</p>
-    <p id="currentBowler">Bowler: None</p>
-  </div>
-
-  <div class="controls">
-    <h3>Scoring</h3>
-    <div>
-      <button onclick="addRuns(0)">0</button>
-      <button onclick="addRuns(1)">1</button>
-      <button onclick="addRuns(2)">2</button>
-      <button onclick="addRuns(3)">3</button>
-      <button onclick="addRuns(4)">4</button>
-      <button onclick="addRuns(6)">6</button>
+  <!-- Foreground content -->
+  <div class="content">
+    <h1>🏏 Rockets Cricket Club</h1>
+    <div class="nav-links">
+      <a href="tournament.html">Tournament Mode</a>
+      <a href="score.html">Scorer Panel</a>
+      <a href="display.html">Live Scoreboard</a>
     </div>
-
-    <h3>Extras</h3>
-    <div>
-      <button onclick="addExtra('wd',1)">1WD</button>
-      <button onclick="addExtra('wd',2)">2WD</button>
-      <button onclick="addExtra('wd',3)">3WD</button>
-      <button onclick="addExtra('wd',4)">4WD</button>
-      <button onclick="addExtra('wd',6)">6WD</button>
-      <button onclick="addExtra('nb',1)">1NB</button>
-      <button onclick="addExtra('nb',2)">2NB</button>
-      <button onclick="addExtra('nb',3)">3NB</button>
-      <button onclick="addExtra('nb',4)">4NB</button>
-      <button onclick="addExtra('nb',6)">6NB</button>
-      <button onclick="addExtra('lb',1)">1LB</button>
-      <button onclick="addExtra('lb',2)">2LB</button>
-      <button onclick="addExtra('lb',3)">3LB</button>
-      <button onclick="addExtra('lb',4)">4LB</button>
-    </div>
-
-    <h3>Wicket</h3>
-    <button onclick="fallOfWicket()">Wicket</button>
-
-    <h3>Set Players</h3>
-    <select id="strikerSelect"><option value="">Select Striker</option></select>
-    <select id="nonStrikerSelect"><option value="">Select Non-Striker</option></select>
-    <select id="bowlerSelect"><option value="">Select Bowler</option></select>
-    <button onclick="setPlayers()">Set Players</button>
-
-    <h3>Over Control</h3>
-    <button onclick="endOver()">End Over (Choose Next Bowler)</button>
-
-    <h3>Match Control</h3>
-    <button onclick="endInnings()">End Innings</button>
-    <button onclick="resetMatch()">Reset Match</button>
-  </div>
-
-  <div class="footer-btn">
-    <button onclick="window.location.href='display.html'">Go to Display</button>
   </div>
 
   <script>
-    let score = 0, wickets = 0, balls = 0, overs = 0;
-    let striker = "None", nonStriker = "None", bowler = "None";
-    let battingTeam = null, bowlingTeam = null;
-    let tournamentData = JSON.parse(localStorage.getItem("tournamentData"));
+    // Dynamically fill the wall with panels
+    const wall = document.getElementById('wall');
+    const cols = 6;
+    const rows = Math.ceil(window.innerHeight / 135); // 120px + 15px gap
+    for(let i=0; i<cols*rows; i++){
+      const panel = document.createElement('div');
+      panel.className = 'panel';
+      wall.appendChild(panel);
+    }
 
-    function loadTeams() {
-      if (tournamentData) {
-        battingTeam = tournamentData.team1;
-        bowlingTeam = tournamentData.team2;
-        document.getElementById("teamName").innerText = battingTeam.name;
-
-        populateDropdown("strikerSelect", battingTeam.players);
-        populateDropdown("nonStrikerSelect", battingTeam.players);
-        populateDropdown("bowlerSelect", bowlingTeam.players);
-      } else {
-        battingTeam = { name: "Team A", players: [] };
-        bowlingTeam = { name: "Team B", players: [] };
+    // Optional: Resize wall panels on window resize
+    window.addEventListener('resize', () => {
+      wall.innerHTML = '';
+      const rows = Math.ceil(window.innerHeight / 135);
+      for(let i=0; i<cols*rows; i++){
+        const panel = document.createElement('div');
+        panel.className = 'panel';
+        wall.appendChild(panel);
       }
-      updateDisplay();
-    }
-
-    function populateDropdown(id, players) {
-      let dropdown = document.getElementById(id);
-      dropdown.innerHTML = "<option value=''>Select</option>";
-      players.forEach(p => {
-        if (p.trim()) {
-          let option = document.createElement("option");
-          option.value = p;
-          option.text = p;
-          dropdown.add(option);
-        }
-      });
-    }
-
-    function updateDisplay() {
-      document.getElementById("teamScore").innerText = `Score: ${score}/${wickets} (${overs}.${balls} overs)`;
-      document.getElementById("currentBatting").innerText = `Currently batting: ${battingTeam ? battingTeam.name : "None"}`;
-      document.getElementById("currentPlayers").innerText = `Striker: ${striker} | Non-Striker: ${nonStriker}`;
-      document.getElementById("currentBowler").innerText = `Bowler: ${bowler}`;
-
-      localStorage.setItem("scoreData", JSON.stringify({
-        score, wickets, overs, balls, striker, nonStriker, bowler,
-        team: battingTeam ? battingTeam.name : "Team"
-      }));
-    }
-
-    function addRuns(runs) {
-      score += runs;
-      balls++;
-      if (balls >= 6) {
-        overs++;
-        balls = 0;
-        alert("Over completed. Please select next bowler.");
-      }
-      if (runs % 2 !== 0) [striker, nonStriker] = [nonStriker, striker];
-      updateDisplay();
-    }
-
-    function addExtra(type, runs) {
-      score += runs;
-      if (type === "lb") {
-        balls++;
-        if (balls >= 6) {
-          overs++;
-          balls = 0;
-          alert("Over completed. Please select next bowler.");
-        }
-      }
-      updateDisplay();
-    }
-
-    function fallOfWicket() {
-      wickets++;
-      striker = "Choose new striker";
-      updateDisplay();
-      alert("Wicket fallen! Please set new striker before continuing.");
-    }
-
-    function setPlayers() {
-      if (document.getElementById("strikerSelect").value) striker = document.getElementById("strikerSelect").value;
-      if (document.getElementById("nonStrikerSelect").value) nonStriker = document.getElementById("nonStrikerSelect").value;
-      if (document.getElementById("bowlerSelect").value) bowler = document.getElementById("bowlerSelect").value;
-      updateDisplay();
-    }
-
-    function endOver() {
-      [striker, nonStriker] = [nonStriker, striker];
-      bowler = "Choose new bowler";
-      updateDisplay();
-      alert("Over ended! Please choose a new bowler.");
-      populateDropdown("bowlerSelect", bowlingTeam.players);
-    }
-
-    function endInnings() {
-      // Swap batting and bowling teams
-      [battingTeam, bowlingTeam] = [bowlingTeam, battingTeam];
-      score = 0; wickets = 0; balls = 0; overs = 0;
-      striker = "None"; nonStriker = "None"; bowler = "None";
-      alert("Innings ended! Now " + battingTeam.name + " is batting.");
-      document.getElementById("teamName").innerText = battingTeam.name;
-      populateDropdown("strikerSelect", battingTeam.players);
-      populateDropdown("nonStrikerSelect", battingTeam.players);
-      populateDropdown("bowlerSelect", bowlingTeam.players);
-      updateDisplay();
-    }
-
-    function resetMatch() {
-      score = 0; wickets = 0; balls = 0; overs = 0;
-      striker = "None"; nonStriker = "None"; bowler = "None";
-      loadTeams();
-      alert("Match reset!");
-    }
-
-    loadTeams();
+    });
   </script>
 </body>
 </html>
