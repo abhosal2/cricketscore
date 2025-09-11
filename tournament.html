@@ -108,6 +108,7 @@
   </div>
 
   <button onclick="saveTournament()">Save Tournament</button>
+  <button onclick="goToScore()">Go to Score Page</button>
 
   <script>
     function saveTournament() {
@@ -144,6 +145,17 @@
 
       localStorage.setItem("tournamentData", JSON.stringify(tournamentData));
       alert("Tournament Data Saved Successfully!");
+    }
+
+    function goToScore() {
+      let inputs = document.querySelectorAll("input");
+      for (let input of inputs) {
+        if (input.value.trim() === "") {
+          alert("⚠️ Please fill all fields before proceeding!");
+          return;
+        }
+      }
+      window.location.href = "score.html";
     }
   </script>
 </body>
