@@ -2,103 +2,64 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Live Scoreboard</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background-color: #121212;
+      background-color: #111;
       color: white;
+      font-family: Arial, sans-serif;
       text-align: center;
+    }
+    .scoreboard {
+      margin: 30px auto;
       padding: 20px;
-    }
-    h1 {
-      color: #8384D4;
-    }
-    .score {
-      margin: 20px auto;
-      padding: 20px;
-      background: #1E1E1E;
-      border-radius: 10px;
-      width: 90%;
-      max-width: 600px;
-      box-shadow: 0 0 10px rgba(131,132,212,0.3);
-    }
-    .extras {
-      margin-top: 10px;
-      font-size: 0.9em;
-      color: #aaa;
-    }
-    .commentary {
-      margin-top: 20px;
-      max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
       background: #2a2a2a;
-      padding: 15px;
       border-radius: 10px;
-      text-align: left;
-      font-size: 0.9em;
-      max-height: 150px;
-      overflow-y: auto;
+      width: 500px;
+      box-shadow: 0 0 15px rgba(131,132,212,0.5);
     }
-    .comment {
+    #commentary {
+      margin-top: 15px;
+      padding: 10px;
       background: #333;
-      padding: 8px;
-      margin-bottom: 6px;
-      border-radius: 6px;
-      animation: fadeIn 0.5s ease;
-    }
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
+      border-radius: 8px;
+      color: #8384D4;
+      font-style: italic;
+      display: none;
     }
   </style>
 </head>
 <body>
-
-  <h1>🏏 Live Scoreboard</h1>
-  <div class="score" id="score"></div>
-
-  <div class="commentary">
-    <h3>Ball-by-Ball Commentary</h3>
-    <div id="comments"></div>
+  <h1>🏏 Rockets Cricket Club</h1>
+  <div class="scoreboard">
+    <h2 id="teamName">--</h2>
+    <p id="score">0/0 (0.0)</p>
+    <p>Striker: <span id="striker">-</span> | Non-Striker: <span id="nonstriker">-</span></p>
+    <p>Bowler: <span id="bowler">-</span></p>
+    <div id="commentary"></div>
   </div>
 
   <script>
-    let lastEventId = null;
+    function loadScore() {
+      const data = localStorage.getItem("scoreData");
+      if (!data) return;
+      const s = JSON.parse(data);
 
-    function render() {
-      let matchData = JSON.parse(localStorage.getItem("matchData")) || {};
-      let t1 = matchData.team1 || "Team 1";
-      let t2 = matchData.team2 || "Team 2";
-      let sc1 = matchData.score?.team1 || {runs:0,wickets:0,overs:0,balls:0};
-      let sc2 = matchData.score?.team2 || {runs:0,wickets:0,overs:0,balls:0};
-      let striker = matchData.striker || "-";
-      let nonStriker = matchData.nonStriker || "-";
-      let bowler = matchData.bowler || "-";
+      document.getElementById("teamName").innerText = s.teamName;
+      document.getElementById("score").innerText = `${s.runs}/${s.wickets} (${s.overs}.${s.balls})`;
+      document.getElementById("striker").innerText = s.striker;
+      document.getElementById("nonstriker").innerText = s.nonStriker;
+      document.getElementById("bowler").innerText = s.bowler;
 
-      document.getElementById("score").innerHTML = `
-        <h2>${t1}: ${sc1.runs}/${sc1.wickets} (${sc1.overs}.${sc1.balls})</h2>
-        <h2>${t2}: ${sc2.runs}/${sc2.wickets} (${sc2.overs}.${sc2.balls})</h2>
-        <p>Striker: ${striker} | Non-Striker: ${nonStriker}</p>
-        <p>Bowler: ${bowler}</p>
-      `;
-
-      // Show commentary log
-      if (matchData.lastEvent && matchData.lastEvent.id !== lastEventId) {
-        lastEventId = matchData.lastEvent.id;
-        let commentBox = document.getElementById("comments");
-        let div = document.createElement("div");
-        div.className = "comment";
-        div.innerText = matchData.lastEvent.text;
-        commentBox.prepend(div);
+      if (s.commentary) {
+        const comm = document.getElementById("commentary");
+        comm.innerText = s.commentary;
+        comm.style.display = "block";
+        setTimeout(() => { comm.style.display = "none"; }, 3000);
       }
     }
 
-    render();
-    setInterval(render, 2000); // refresh every 2s
+    setInterval(loadScore, 1000); // auto-refresh every 1s
   </script>
-
 </body>
 </html>
