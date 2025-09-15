@@ -13,8 +13,9 @@
       overflow: hidden;
       position: relative;
       height: 100vh;
-      background: radial-gradient(circle at top, #0d1b3d, #000000 80%);
-      background-image: radial-gradient(circle at top, #0d1b3d, #000000 80%), url('https://www.transparenttextures.com/patterns/stardust.png');
+      background: radial-gradient(circle at top, #0d1b3d, #000000 85%);
+      background-image: radial-gradient(circle at top, #0d1b3d, #000000 85%), 
+        url('https://www.transparenttextures.com/patterns/stardust.png');
       background-size: cover;
     }
 
@@ -23,11 +24,29 @@
       font-family: "Copperplate Gothic Light", "Copperplate", Arial, sans-serif;
       font-size: 48px;
       color: #4ab3ff;
-      text-shadow: 0 0 15px #4ab3ff, 0 0 30px #0077ff, 0 0 45px #0044aa;
+      text-shadow: 0 0 6px #4ab3ff, 0 0 12px #003366;
       margin-bottom: 40px;
       letter-spacing: 3px;
       position: relative;
       z-index: 1;
+      animation: flyIn 3s ease-out forwards;
+      opacity: 0;
+    }
+
+    @keyframes flyIn {
+      0% {
+        transform: scale(8) translateY(200px);
+        opacity: 0;
+        filter: blur(10px);
+      }
+      50% {
+        opacity: 0.7;
+      }
+      100% {
+        transform: scale(1) translateY(0);
+        opacity: 1;
+        filter: blur(0);
+      }
     }
 
     .nav-links {
@@ -42,7 +61,7 @@
     a {
       display: inline-block;
       padding: 15px 30px;
-      background: #8384D4;
+      background: #5c5db5;
       color: white;
       text-decoration: none;
       border-radius: 10px;
@@ -54,7 +73,7 @@
     }
 
     a:hover {
-      background: #6a6bc0;
+      background: #4647a3;
     }
 
     /* Cinematic glowing wall */
@@ -77,25 +96,26 @@
     .panel {
       background: #111;
       border: 2px solid rgba(255, 255, 255, 0.05);
-      box-shadow: 0 0 15px rgba(0, 255, 255, 0.4), inset 0 0 15px rgba(0, 255, 255, 0.2);
+      box-shadow: 0 0 10px rgba(0, 200, 255, 0.3), 
+                  inset 0 0 10px rgba(0, 200, 255, 0.15);
       animation: glowWave 3s infinite;
     }
 
     /* Multiple colors for panels */
     .panel:nth-child(3n) { --color: #0ff; }
-    .panel:nth-child(3n+1) { --color: #ff0fff; }
+    .panel:nth-child(3n+1) { --color: #66f; }
     .panel:nth-child(3n+2) { --color: #9b59b6; }
 
     @keyframes glowWave {
       0%, 100% {
         box-shadow:
-          0 0 10px var(--color, #0ff),
-          inset 0 0 10px rgba(0,255,255,0.1);
+          0 0 8px var(--color, #0ff),
+          inset 0 0 6px rgba(0,255,255,0.1);
       }
       50% {
         box-shadow:
-          0 0 35px var(--color, #0ff),
-          inset 0 0 20px rgba(0,255,255,0.3);
+          0 0 18px var(--color, #0ff),
+          inset 0 0 12px rgba(0,255,255,0.25);
       }
     }
   </style>
