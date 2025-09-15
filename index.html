@@ -13,14 +13,19 @@
       overflow: hidden;
       position: relative;
       height: 100vh;
-      background: #0F2447;
+      background: radial-gradient(circle at top, #0d1b3d, #000000 80%);
+      background-image: radial-gradient(circle at top, #0d1b3d, #000000 80%), url('https://www.transparenttextures.com/patterns/stardust.png');
+      background-size: cover;
     }
 
+    /* Superman-style title */
     h1 {
       font-family: "Copperplate Gothic Light", "Copperplate", Arial, sans-serif;
-      font-size: 36px;
-      color: #ffffff;
+      font-size: 48px;
+      color: #4ab3ff;
+      text-shadow: 0 0 15px #4ab3ff, 0 0 30px #0077ff, 0 0 45px #0044aa;
       margin-bottom: 40px;
+      letter-spacing: 3px;
       position: relative;
       z-index: 1;
     }
@@ -41,7 +46,8 @@
       color: white;
       text-decoration: none;
       border-radius: 10px;
-      font-size: 1.2em;
+      font-family: "Times New Roman", serif;
+      font-size: 24px;
       transition: background 0.3s;
       position: relative;
       z-index: 1;
@@ -51,7 +57,7 @@
       background: #6a6bc0;
     }
 
-    /* Cinematic Peacemaker-style wall */
+    /* Cinematic glowing wall */
     .wall {
       position: fixed;
       top: 0;
