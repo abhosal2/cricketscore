@@ -2,131 +2,307 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Cricket Score Tracker</title>
+  <title>Cricket Score Management</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f2f2f2;
-      margin: 0;
-      padding: 0;
-    }
-    .container {
-      width: 600px;
-      margin: 30px auto;
-      background: #fff;
-      padding: 20px;
-      border-radius: 12px;
-      box-shadow: 0px 4px 10px rgba(0,0,0,0.1);
-    }
-    h1 {
-      text-align: center;
-      margin-bottom: 20px;
-    }
-    .form-group {
-      margin-bottom: 15px;
-    }
-    label {
-      display: block;
-      margin-bottom: 5px;
-      font-weight: bold;
-    }
-    select, input {
-      width: 100%;
-      padding: 8px;
-      border: 1px solid #ccc;
-      border-radius: 6px;
-    }
-    button {
-      background: #28a745;
+      background-color: #121212;
       color: white;
-      border: none;
-      padding: 12px;
-      border-radius: 6px;
-      width: 100%;
-      font-size: 16px;
-      cursor: pointer;
-    }
-    button:hover {
-      background: #218838;
-    }
-    .score-panel {
-      margin-top: 25px;
-      padding: 15px;
-      background: #f9f9f9;
-      border: 1px solid #ddd;
-      border-radius: 8px;
-    }
-    .score-panel h2 {
-      margin-top: 0;
       text-align: center;
+      padding: 20px;
     }
+    .scoreboard, .controls {
+      background: #1e1e2f;
+      padding: 20px;
+      margin: 20px auto;
+      border-radius: 10px;
+      width: 80%;
+      max-width: 800px;
+      box-shadow: 0px 0px 10px #8384D4;
+    }
+    h1, h2, h3 {
+      font-family: "Copperplate Gothic Light", "Copperplate", Arial, sans-serif;
+    }
+    h1 { font-size: 22px; color: #8384D4; }
+    h2 { font-size: 20px; color: #ffffff; }
+    h3 { font-size: 18px; color: #8384D4; margin-top: 20px; }
+    button {
+      margin: 5px; padding: 10px 15px;
+      border: none; border-radius: 6px;
+      background: #8384D4; color: white;
+      font-size: 14px; cursor: pointer;
+    }
+    button:hover { background: #6a6bc0; }
+    select {
+      margin: 5px; padding: 8px;
+      border-radius: 6px; border: none;
+      font-size: 14px;
+    }
+    .footer-btn { margin-top: 20px; }
+    .row { margin: 10px 0; }
   </style>
 </head>
 <body>
-  <div class="container">
-    <h1>Update Cricket Score</h1>
-    
-    <div class="form-group">
-      <label for="team">Select Batting Team</label>
-      <select id="team">
-        <option value="Team A">Team A</option>
-        <option value="Team B">Team B</option>
-      </select>
-    </div>
-    
-    <div class="form-group">
-      <label for="runs">Runs</label>
-      <input type="number" id="runs" placeholder="Enter runs">
-    </div>
-    
-    <div class="form-group">
-      <label for="wickets">Wickets</label>
-      <input type="number" id="wickets" placeholder="Enter wickets">
-    </div>
-    
-    <div class="form-group">
-      <label for="overs">Overs</label>
-      <input type="text" id="overs" placeholder="e.g., 12.3">
-    </div>
-    
-    <button onclick="updateScore()">Update Score</button>
-    
-    <div class="score-panel">
-      <h2>Live Score</h2>
-      <p id="displayScore">No score yet</p>
-    </div>
+  <h1>🏏 Cricket Score Manager</h1>
+
+  <div class="scoreboard">
+    <h2 id="teamName">Team</h2>
+    <p id="teamScore">Score: 0/0 (0.0 overs)</p>
+    <p id="netRunRate">NRR: 0.00</p>
+    <p id="targetMessage"></p>
+    <p id="currentBatting">Currently batting: None</p>
+    <p id="currentPlayers">Striker: None | Non-Striker: None</p>
+    <p id="currentBowler">Bowler: None</p>
   </div>
-  
+
+  <div class="controls">
+    <h3>Scoring</h3>
+    <div class="row">
+      <select id="runsSelect">
+        <option value="">Select Runs</option>
+        <option value="0">0</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4 (Boundary)</option>
+        <option value="6">6 (Six)</option>
+      </select>
+      <button onclick="applyRuns()">Add Runs</button>
+    </div>
+
+    <h3>Extras</h3>
+    <div class="row">
+      <select id="extrasSelect">
+        <option value="">Select Extra</option>
+        <option value="wd1">1 Wide</option>
+        <option value="wd2">2 Wide</option>
+        <option value="wd3">3 Wide</option>
+        <option value="wd4">4 Wide</option>
+        <option value="wd6">6 Wide</option>
+        <option value="nb1">1 No Ball</option>
+        <option value="nb2">2 No Ball</option>
+        <option value="nb3">3 No Ball</option>
+        <option value="nb4">4 No Ball</option>
+        <option value="nb6">6 No Ball</option>
+        <option value="lb1">1 Leg Bye</option>
+        <option value="lb2">2 Leg Bye</option>
+        <option value="lb3">3 Leg Bye</option>
+        <option value="lb4">4 Leg Bye</option>
+      </select>
+      <button onclick="applyExtras()">Add Extra</button>
+    </div>
+
+    <h3>Wicket</h3>
+    <button onclick="fallOfWicket()">Wicket</button>
+
+    <h3>Undo</h3>
+    <button onclick="undoLast()">Undo Last Action</button>
+
+    <h3>Set Players</h3>
+    <select id="strikerSelect"><option value="">Select Striker</option></select>
+    <select id="nonStrikerSelect"><option value="">Select Non-Striker</option></select>
+    <select id="bowlerSelect"><option value="">Select Bowler</option></select>
+    <button onclick="setPlayers()">Set Players</button>
+
+    <h3>Over Control</h3>
+    <button onclick="endOver()">End Over (Choose Next Bowler)</button>
+
+    <h3>Match Control</h3>
+    <button onclick="endInnings()">End Innings</button>
+    <button onclick="resetMatch()">Reset Match</button>
+  </div>
+
+  <div class="footer-btn">
+    <button onclick="window.location.href='display.html'">Go to Display</button>
+  </div>
+
   <script>
     const scriptURL = "https://script.google.com/macros/s/AKfycbyYkUO01c9FpoLwGj_y8ALbPt2_WVvac_W1QxGNkqKnp54VRb6wBEPKmEzpOjuP-7fP6Q/exec";
-    
-    function updateScore() {
-      const team = document.getElementById("team").value;
-      const runs = document.getElementById("runs").value;
-      const wickets = document.getElementById("wickets").value;
-      const overs = document.getElementById("overs").value;
-      
-      const scoreText = `${team}: ${runs}/${wickets} in ${overs} overs`;
-      document.getElementById("displayScore").innerText = scoreText;
-      
-      // Send to Google Sheets
-      fetch(scriptURL, {
-        method: 'POST',
-        body: new URLSearchParams({
-          team: team,
-          runs: runs,
-          wickets: wickets,
-          overs: overs
-        })
-      })
-      .then(response => response.text())
-      .then(result => {
-        console.log("Saved:", result);
-      })
-      .catch(error => {
-        console.error("Error!", error);
+
+    let score = 0, wickets = 0, balls = 0, overs = 0;
+    let striker = "None", nonStriker = "None", bowler = "None";
+    let battingTeam = null, bowlingTeam = null;
+    let tournamentData = JSON.parse(localStorage.getItem("tournamentData"));
+    let lastAction = null;
+    let firstInningsScore = null;
+
+    function loadTeams() {
+      if (tournamentData) {
+        battingTeam = tournamentData.team1;
+        bowlingTeam = tournamentData.team2;
+        document.getElementById("teamName").innerText = battingTeam.name;
+        populateDropdown("strikerSelect", battingTeam.players);
+        populateDropdown("nonStrikerSelect", battingTeam.players);
+        populateDropdown("bowlerSelect", bowlingTeam.players);
+      } else {
+        battingTeam = { name: "Team A", players: [] };
+        bowlingTeam = { name: "Team B", players: [] };
+      }
+      updateDisplay();
+    }
+
+    function populateDropdown(id, players) {
+      let dropdown = document.getElementById(id);
+      dropdown.innerHTML = "<option value=''>Select</option>";
+      players.forEach(p => {
+        if (p.trim()) {
+          let option = document.createElement("option");
+          option.value = p;
+          option.text = p;
+          dropdown.add(option);
+        }
       });
     }
+
+    function updateDisplay() {
+      document.getElementById("teamScore").innerText = `Score: ${score}/${wickets} (${overs}.${balls} overs)`;
+      let totalOvers = overs + balls/6;
+      let nrr = totalOvers > 0 ? (score/totalOvers).toFixed(2) : "0.00";
+      document.getElementById("netRunRate").innerText = `NRR: ${nrr}`;
+      document.getElementById("currentBatting").innerText = `Currently batting: ${battingTeam ? battingTeam.name : "None"}`;
+      document.getElementById("currentPlayers").innerText = `Striker: ${striker} | Non-Striker: ${nonStriker}`;
+      document.getElementById("currentBowler").innerText = `Bowler: ${bowler}`;
+
+      // Send update to Google Sheets
+      saveToSheets();
+    }
+
+    function saveToSheets() {
+      const data = {
+        team: battingTeam ? battingTeam.name : "Team",
+        runs: score,
+        wickets: wickets,
+        overs: `${overs}.${balls}`,
+        striker: striker,
+        nonStriker: nonStriker,
+        bowler: bowler
+      };
+      fetch(scriptURL, {
+        method: "POST",
+        body: JSON.stringify(data),
+        headers: { "Content-Type": "application/json" }
+      }).catch(err => console.error("Error saving to Sheets:", err));
+    }
+
+    function applyRuns() {
+      let runs = parseInt(document.getElementById("runsSelect").value);
+      if (isNaN(runs)) return;
+      lastAction = { type: "runs", runs: runs };
+      addRuns(runs);
+    }
+
+    function addRuns(runs) {
+      score += runs;
+      balls++;
+      if (balls >= 6) {
+        overs++;
+        balls = 0;
+        alert("Over completed. Please select next bowler.");
+      }
+      if (runs % 2 !== 0) [striker, nonStriker] = [nonStriker, striker];
+      updateDisplay();
+    }
+
+    function applyExtras() {
+      let val = document.getElementById("extrasSelect").value;
+      if (!val) return;
+      let type = val.slice(0,2), runs = parseInt(val.slice(2));
+      lastAction = { type: "extra", subtype: type, runs: runs };
+      addExtra(type, runs);
+    }
+
+    function addExtra(type, runs) {
+      score += runs;
+      if (type === "lb") {
+        balls++;
+        if (balls >= 6) {
+          overs++;
+          balls = 0;
+          alert("Over completed. Please select next bowler.");
+        }
+      }
+      updateDisplay();
+    }
+
+    function fallOfWicket() {
+      wickets++;
+      lastAction = { type: "wicket" };
+      striker = "Choose new striker";
+      updateDisplay();
+      alert("Wicket fallen! Please set new striker.");
+    }
+
+    function undoLast() {
+      if (!lastAction) return;
+      if (lastAction.type === "runs") {
+        score -= lastAction.runs;
+        if (balls === 0 && overs > 0) {
+          overs--;
+          balls = 5;
+        } else {
+          balls--;
+        }
+      } else if (lastAction.type === "extra") {
+        score -= lastAction.runs;
+        if (lastAction.subtype === "lb") {
+          if (balls === 0 && overs > 0) {
+            overs--;
+            balls = 5;
+          } else {
+            balls--;
+          }
+        }
+      } else if (lastAction.type === "wicket") {
+        wickets--;
+        striker = "None";
+      }
+      lastAction = null;
+      updateDisplay();
+    }
+
+    function setPlayers() {
+      if (document.getElementById("strikerSelect").value) striker = document.getElementById("strikerSelect").value;
+      if (document.getElementById("nonStrikerSelect").value) nonStriker = document.getElementById("nonStrikerSelect").value;
+      if (document.getElementById("bowlerSelect").value) bowler = document.getElementById("bowlerSelect").value;
+      updateDisplay();
+    }
+
+    function endOver() {
+      [striker, nonStriker] = [nonStriker, striker];
+      bowler = "Choose new bowler";
+      updateDisplay();
+      alert("Over ended! Please choose a new bowler.");
+      populateDropdown("bowlerSelect", bowlingTeam.players);
+    }
+
+    function endInnings() {
+      if (firstInningsScore === null) {
+        firstInningsScore = score;
+        alert(`Innings ended! ${battingTeam.name} scored ${score}.`);
+      } else {
+        let target = firstInningsScore + 1;
+        document.getElementById("targetMessage").innerText = `${battingTeam.name} needs ${target - score} more runs to win.`;
+      }
+      [battingTeam, bowlingTeam] = [bowlingTeam, battingTeam];
+      score = 0; wickets = 0; balls = 0; overs = 0;
+      striker = "None"; nonStriker = "None"; bowler = "None";
+      document.getElementById("teamName").innerText = battingTeam.name;
+      populateDropdown("strikerSelect", battingTeam.players);
+      populateDropdown("nonStrikerSelect", battingTeam.players);
+      populateDropdown("bowlerSelect", bowlingTeam.players);
+      updateDisplay();
+    }
+
+    function resetMatch() {
+      score = 0; wickets = 0; balls = 0; overs = 0;
+      striker = "None"; nonStriker = "None"; bowler = "None";
+      firstInningsScore = null;
+      document.getElementById("targetMessage").innerText = "";
+      loadTeams();
+      alert("Match reset!");
+    }
+
+    loadTeams();
   </script>
 </body>
 </html>
