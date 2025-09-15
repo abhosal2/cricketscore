@@ -2,71 +2,63 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Live Cricket Score</title>
+  <title>Live Scoreboard</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #111;
-      color: #fff;
-      margin: 0;
-      padding: 0;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-    }
-    .score-board {
-      background: #222;
-      padding: 30px;
-      border-radius: 15px;
-      box-shadow: 0px 4px 15px rgba(0,0,0,0.6);
+      background: #0d1b3d;
+      color: white;
       text-align: center;
-      width: 400px;
+      padding: 40px;
     }
     h1 {
+      font-size: 36px;
       margin-bottom: 20px;
-      font-size: 28px;
-      color: #ffd700;
+      color: #4ab3ff;
     }
-    #liveScore {
+    .scoreboard {
+      display: inline-block;
+      background: rgba(0,0,0,0.6);
+      padding: 30px 50px;
+      border-radius: 12px;
+      box-shadow: 0 0 15px rgba(0,200,255,0.4);
       font-size: 22px;
+    }
+    .team {
       font-weight: bold;
-      margin-top: 15px;
+      font-size: 26px;
+      margin: 10px 0;
     }
   </style>
 </head>
 <body>
-  <div class="score-board">
-    <h1>Live Cricket Score</h1>
-    <p id="liveScore">Loading...</p>
+  <h1>🏏 Live Scoreboard</h1>
+  <div class="scoreboard">
+    <div class="team" id="teamAName">Team A</div>
+    <div id="teamAScore">0 / 0 (0.0)</div>
+    <hr>
+    <div class="team" id="teamBName">Team B</div>
+    <div id="teamBScore">0 / 0 (0.0)</div>
   </div>
 
   <script>
-    const scriptURL = "https://script.google.com/macros/s/AKfycbyYkUO01c9FpoLwGj_y8ALbPt2_WVvac_W1QxGNkqKnp54VRb6wBEPKmEzpOjuP-7fP6Q/exec";
-
-    async function fetchScore() {
+    async function fetchScores() {
       try {
-        const response = await fetch(scriptURL);
+        const response = await fetch("https://script.google.com/macros/s/AKfycbyYkUO01c9FpoLwGj_y8ALbPt2_WVvac_W1QxGNkqKnp54VRb6wBEPKmEzpOjuP-7fP6Q/exec");
         const data = await response.json();
 
-        // Assuming your Google Script returns an array of rows
-        // We’ll grab the latest (last row)
-        if (data && data.length > 0) {
-          const latest = data[data.length - 1];
-          const scoreText = `${latest.team}: ${latest.runs}/${latest.wickets} in ${latest.overs} overs`;
-          document.getElementById("liveScore").innerText = scoreText;
-        } else {
-          document.getElementById("liveScore").innerText = "No score available.";
-        }
+        document.getElementById("teamAName").textContent = data.teamA || "Team A";
+        document.getElementById("teamAScore").textContent = `${data.scoreA || 0} / ${data.wicketsA || 0} (${data.oversA || "0.0"})`;
+
+        document.getElementById("teamBName").textContent = data.teamB || "Team B";
+        document.getElementById("teamBScore").textContent = `${data.scoreB || 0} / ${data.wicketsB || 0} (${data.oversB || "0.0"})`;
       } catch (err) {
-        console.error("Error fetching score:", err);
-        document.getElementById("liveScore").innerText = "Error loading score.";
+        console.error("Error fetching scores:", err);
       }
     }
 
-    // Fetch immediately, then refresh every 10 seconds
-    fetchScore();
-    setInterval(fetchScore, 10000);
+    fetchScores();
+    setInterval(fetchScores, 5000); // refresh every 5 seconds
   </script>
 </body>
 </html>
