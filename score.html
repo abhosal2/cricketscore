@@ -36,19 +36,16 @@
       font-size: 14px;
       cursor: pointer;
     }
-    button:hover {
-      background: #6a6bc0;
-    }
-    select, input {
+    button:hover { background: #6a6bc0; }
+    select {
       margin: 5px;
       padding: 8px;
       border-radius: 6px;
       border: none;
       font-size: 14px;
     }
-    .footer-btn {
-      margin-top: 20px;
-    }
+    .footer-btn { margin-top: 20px; }
+    .row { margin: 10px 0; }
   </style>
 </head>
 <body>
@@ -57,6 +54,8 @@
   <div class="scoreboard">
     <h2 id="teamName">Team</h2>
     <p id="teamScore">Score: 0/0 (0.0 overs)</p>
+    <p id="netRunRate">NRR: 0.00</p>
+    <p id="targetMessage"></p>
     <p id="currentBatting">Currently batting: None</p>
     <p id="currentPlayers">Striker: None | Non-Striker: None</p>
     <p id="currentBowler">Bowler: None</p>
@@ -64,35 +63,46 @@
 
   <div class="controls">
     <h3>Scoring</h3>
-    <div>
-      <button onclick="addRuns(0)">0</button>
-      <button onclick="addRuns(1)">1</button>
-      <button onclick="addRuns(2)">2</button>
-      <button onclick="addRuns(3)">3</button>
-      <button onclick="addRuns(4)">4</button>
-      <button onclick="addRuns(6)">6</button>
+    <div class="row">
+      <select id="runsSelect">
+        <option value="">Select Runs</option>
+        <option value="0">0</option>
+        <option value="1">1</option>
+        <option value="2">2</option>
+        <option value="3">3</option>
+        <option value="4">4 (Boundary)</option>
+        <option value="6">6 (Six)</option>
+      </select>
+      <button onclick="applyRuns()">Add Runs</button>
     </div>
 
     <h3>Extras</h3>
-    <div>
-      <button onclick="addExtra('wd',1)">1WD</button>
-      <button onclick="addExtra('wd',2)">2WD</button>
-      <button onclick="addExtra('wd',3)">3WD</button>
-      <button onclick="addExtra('wd',4)">4WD</button>
-      <button onclick="addExtra('wd',6)">6WD</button>
-      <button onclick="addExtra('nb',1)">1NB</button>
-      <button onclick="addExtra('nb',2)">2NB</button>
-      <button onclick="addExtra('nb',3)">3NB</button>
-      <button onclick="addExtra('nb',4)">4NB</button>
-      <button onclick="addExtra('nb',6)">6NB</button>
-      <button onclick="addExtra('lb',1)">1LB</button>
-      <button onclick="addExtra('lb',2)">2LB</button>
-      <button onclick="addExtra('lb',3)">3LB</button>
-      <button onclick="addExtra('lb',4)">4LB</button>
+    <div class="row">
+      <select id="extrasSelect">
+        <option value="">Select Extra</option>
+        <option value="wd1">1 Wide</option>
+        <option value="wd2">2 Wide</option>
+        <option value="wd3">3 Wide</option>
+        <option value="wd4">4 Wide</option>
+        <option value="wd6">6 Wide</option>
+        <option value="nb1">1 No Ball</option>
+        <option value="nb2">2 No Ball</option>
+        <option value="nb3">3 No Ball</option>
+        <option value="nb4">4 No Ball</option>
+        <option value="nb6">6 No Ball</option>
+        <option value="lb1">1 Leg Bye</option>
+        <option value="lb2">2 Leg Bye</option>
+        <option value="lb3">3 Leg Bye</option>
+        <option value="lb4">4 Leg Bye</option>
+      </select>
+      <button onclick="applyExtras()">Add Extra</button>
     </div>
 
     <h3>Wicket</h3>
     <button onclick="fallOfWicket()">Wicket</button>
+
+    <h3>Undo</h3>
+    <button onclick="undoLast()">Undo Last Action</button>
 
     <h3>Set Players</h3>
     <select id="strikerSelect"><option value="">Select Striker</option></select>
@@ -117,6 +127,8 @@
     let striker = "None", nonStriker = "None", bowler = "None";
     let battingTeam = null, bowlingTeam = null;
     let tournamentData = JSON.parse(localStorage.getItem("tournamentData"));
+    let lastAction = null;
+    let firstInningsScore = null;
 
     function loadTeams() {
       if (tournamentData) {
@@ -149,46 +161,70 @@
 
     function updateDisplay() {
       document.getElementById("teamScore").innerText = `Score: ${score}/${wickets} (${overs}.${balls} overs)`;
+      let totalOvers = overs + balls/6;
+      let nrr = totalOvers > 0 ? (score/totalOvers).toFixed(2) : "0.00";
+      document.getElementById("netRunRate").innerText = `NRR: ${nrr}`;
       document.getElementById("currentBatting").innerText = `Currently batting: ${battingTeam ? battingTeam.name : "None"}`;
       document.getElementById("currentPlayers").innerText = `Striker: ${striker} | Non-Striker: ${nonStriker}`;
       document.getElementById("currentBowler").innerText = `Bowler: ${bowler}`;
+    }
 
-      localStorage.setItem("scoreData", JSON.stringify({
-        score, wickets, overs, balls, striker, nonStriker, bowler,
-        team: battingTeam ? battingTeam.name : "Team"
-      }));
+    function applyRuns() {
+      let runs = parseInt(document.getElementById("runsSelect").value);
+      if (isNaN(runs)) return;
+      lastAction = { type: "runs", runs: runs };
+      addRuns(runs);
     }
 
     function addRuns(runs) {
       score += runs;
       balls++;
-      if (balls >= 6) {
-        overs++;
-        balls = 0;
-        alert("Over completed. Please select next bowler.");
-      }
+      if (balls >= 6) { overs++; balls = 0; alert("Over completed. Please select next bowler."); }
       if (runs % 2 !== 0) [striker, nonStriker] = [nonStriker, striker];
       updateDisplay();
+    }
+
+    function applyExtras() {
+      let val = document.getElementById("extrasSelect").value;
+      if (!val) return;
+      let type = val.slice(0,2), runs = parseInt(val.slice(2));
+      lastAction = { type: "extra", subtype: type, runs: runs };
+      addExtra(type, runs);
     }
 
     function addExtra(type, runs) {
       score += runs;
       if (type === "lb") {
         balls++;
-        if (balls >= 6) {
-          overs++;
-          balls = 0;
-          alert("Over completed. Please select next bowler.");
-        }
+        if (balls >= 6) { overs++; balls = 0; alert("Over completed. Please select next bowler."); }
       }
       updateDisplay();
     }
 
     function fallOfWicket() {
       wickets++;
+      lastAction = { type: "wicket" };
       striker = "Choose new striker";
       updateDisplay();
-      alert("Wicket fallen! Please set new striker before continuing.");
+      alert("Wicket fallen! Please set new striker.");
+    }
+
+    function undoLast() {
+      if (!lastAction) return;
+      if (lastAction.type === "runs") {
+        score -= lastAction.runs;
+        if (balls === 0 && overs > 0) { overs--; balls = 5; } else { balls--; }
+      } else if (lastAction.type === "extra") {
+        score -= lastAction.runs;
+        if (lastAction.subtype === "lb") {
+          if (balls === 0 && overs > 0) { overs--; balls = 5; } else { balls--; }
+        }
+      } else if (lastAction.type === "wicket") {
+        wickets--;
+        striker = "None";
+      }
+      lastAction = null;
+      updateDisplay();
     }
 
     function setPlayers() {
@@ -207,11 +243,16 @@
     }
 
     function endInnings() {
-      // Swap batting and bowling teams
+      if (firstInningsScore === null) {
+        firstInningsScore = score;
+        alert(`Innings ended! ${battingTeam.name} scored ${score}.`);
+      } else {
+        let target = firstInningsScore + 1;
+        document.getElementById("targetMessage").innerText = `${battingTeam.name} needs ${target - score} more runs to win.`;
+      }
       [battingTeam, bowlingTeam] = [bowlingTeam, battingTeam];
       score = 0; wickets = 0; balls = 0; overs = 0;
       striker = "None"; nonStriker = "None"; bowler = "None";
-      alert("Innings ended! Now " + battingTeam.name + " is batting.");
       document.getElementById("teamName").innerText = battingTeam.name;
       populateDropdown("strikerSelect", battingTeam.players);
       populateDropdown("nonStrikerSelect", battingTeam.players);
@@ -222,6 +263,8 @@
     function resetMatch() {
       score = 0; wickets = 0; balls = 0; overs = 0;
       striker = "None"; nonStriker = "None"; bowler = "None";
+      firstInningsScore = null;
+      document.getElementById("targetMessage").innerText = "";
       loadTeams();
       alert("Match reset!");
     }
