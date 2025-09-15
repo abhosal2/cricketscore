@@ -2,77 +2,167 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Score Panel</title>
+  <title>Rockets CC - Scorer Panel</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #111;
+      background: linear-gradient(to bottom, #001f3f, #000);
       color: white;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
+      margin: 0;
+      padding: 20px;
       text-align: center;
     }
-    h1 { font-size: 40px; margin-bottom: 20px; }
-    input {
-      font-size: 20px;
-      margin: 10px;
-      padding: 5px 10px;
-      text-align: center;
-      width: 100px;
+    h1 {
+      margin-bottom: 20px;
+      color: #4ab3ff;
+      text-shadow: 0 0 8px #003366;
     }
-    button {
-      font-size: 20px;
-      margin: 10px;
-      padding: 10px 20px;
-      cursor: pointer;
-      border-radius: 6px;
+    .scoreboard {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.05);
+      border-radius: 10px;
+      padding: 20px;
+      box-shadow: 0 0 12px rgba(0, 200, 255, 0.3);
+      margin-bottom: 20px;
+    }
+    .scoreboard h2 {
+      margin: 10px 0;
+    }
+    .controls button {
+      margin: 5px;
+      padding: 10px 15px;
+      font-size: 16px;
       border: none;
-      background: #4ab3ff;
-      color: #fff;
-      transition: background 0.3s;
+      border-radius: 6px;
+      background: #5c5db5;
+      color: white;
+      cursor: pointer;
+      transition: background 0.2s;
     }
-    button:hover {
-      background: #2a7fcc;
+    .controls button:hover {
+      background: #4647a3;
     }
-    #status { margin-top: 20px; font-size: 18px; }
+    .input-group {
+      margin: 10px 0;
+    }
+    label {
+      margin-right: 10px;
+    }
+    select, input {
+      padding: 5px;
+      font-size: 14px;
+      border-radius: 5px;
+      border: none;
+    }
   </style>
 </head>
 <body>
-  <h1>🏏 Score Panel</h1>
+  <h1>🏏 Rockets Cricket Club - Scorer Panel</h1>
 
-  <label>Runs: <input type="number" id="runs" value="0"></label><br>
-  <label>Wickets: <input type="number" id="wickets" value="0"></label><br>
+  <div class="scoreboard">
+    <div class="input-group">
+      <label for="teamA">Team A:</label>
+      <input type="text" id="teamA" placeholder="Enter Team A">
+      <label for="teamB">Team B:</label>
+      <input type="text" id="teamB" placeholder="Enter Team B">
+    </div>
 
-  <button onclick="updateScore()">Update Score</button>
+    <div class="input-group">
+      <label for="overs">Overs:</label>
+      <input type="number" id="overs" value="20">
+    </div>
 
-  <div id="status"></div>
+    <h2 id="score">Score: 0/0 (0.0)</h2>
+    <h3 id="extras">Extras: 0</h3>
+  </div>
+
+  <div class="controls">
+    <button onclick="addRun(0)">0</button>
+    <button onclick="addRun(1)">1</button>
+    <button onclick="addRun(2)">2</button>
+    <button onclick="addRun(3)">3</button>
+    <button onclick="addRun(4)">4</button>
+    <button onclick="addRun(6)">6</button>
+    <button onclick="addWicket()">Wicket</button>
+    <button onclick="addExtra('Wide')">Wide</button>
+    <button onclick="addExtra('No Ball')">No Ball</button>
+    <button onclick="resetScore()">Reset</button>
+  </div>
 
   <script>
-    const scriptURL = "https://script.google.com/macros/s/AKfycbyYkUO01c9FpoLwGj_y8ALbPt2_WVvac_W1QxGNkqKnp54VRb6wBEPKmEzpOjuP-7fP6Q/exec";
+    let runs = 0;
+    let wickets = 0;
+    let balls = 0;
+    let extras = 0;
+    let maxOvers = 20;
 
-    async function updateScore() {
-      const runs = document.getElementById("runs").value;
-      const wickets = document.getElementById("wickets").value;
+    const scoreEl = document.getElementById('score');
+    const extrasEl = document.getElementById('extras');
 
-      try {
-        const response = await fetch(scriptURL, {
-          method: "POST",
-          body: JSON.stringify({ runs, wickets }),
-          headers: { "Content-Type": "application/json" }
-        });
-
-        const text = await response.text();
-        document.getElementById("status").textContent = text === "Success"
-          ? "✅ Score updated!"
-          : "⚠️ Update failed";
-      } catch (err) {
-        console.error(err);
-        document.getElementById("status").textContent = "❌ Error updating score";
-      }
+    function updateDisplay() {
+      let overs = Math.floor(balls / 6);
+      let ballsRem = balls % 6;
+      scoreEl.textContent = `Score: ${runs}/${wickets} (${overs}.${ballsRem})`;
+      extrasEl.textContent = `Extras: ${extras}`;
     }
+
+    function addRun(run) {
+      runs += run;
+      balls++;
+      updateDisplay();
+      saveData();
+    }
+
+    function addWicket() {
+      wickets++;
+      balls++;
+      updateDisplay();
+      saveData();
+    }
+
+    function addExtra(type) {
+      extras++;
+      runs++;
+      // wides and no-balls don’t count as legal deliveries
+      updateDisplay();
+      saveData();
+    }
+
+    function resetScore() {
+      runs = 0;
+      wickets = 0;
+      balls = 0;
+      extras = 0;
+      updateDisplay();
+      saveData();
+    }
+
+    function saveData() {
+      const teamA = document.getElementById('teamA').value || "Team A";
+      const teamB = document.getElementById('teamB').value || "Team B";
+      const overs = maxOvers;
+
+      fetch("https://script.google.com/macros/s/AKfycbyYkUO01c9FpoLwGj_y8ALbPt2_WVvac_W1QxGNkqKnp54VRb6wBEPKmEzpOjuP-7fP6Q/exec", {
+        method: "POST",
+        body: JSON.stringify({
+          teamA: teamA,
+          teamB: teamB,
+          runs: runs,
+          wickets: wickets,
+          balls: balls,
+          extras: extras,
+          overs: overs
+        }),
+        headers: {
+          "Content-Type": "application/json"
+        }
+      })
+      .then(res => res.text())
+      .then(msg => console.log("Saved:", msg))
+      .catch(err => console.error("Error:", err));
+    }
+
+    updateDisplay();
   </script>
 </body>
 </html>
