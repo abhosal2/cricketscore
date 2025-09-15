@@ -1,168 +1,179 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Rockets CC - Scorer Panel</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      background: linear-gradient(to bottom, #001f3f, #000);
-      color: white;
-      margin: 0;
-      padding: 20px;
-      text-align: center;
-    }
-    h1 {
-      margin-bottom: 20px;
-      color: #4ab3ff;
-      text-shadow: 0 0 8px #003366;
-    }
-    .scoreboard {
-      display: inline-block;
-      background: rgba(255, 255, 255, 0.05);
-      border-radius: 10px;
-      padding: 20px;
-      box-shadow: 0 0 12px rgba(0, 200, 255, 0.3);
-      margin-bottom: 20px;
-    }
-    .scoreboard h2 {
-      margin: 10px 0;
-    }
-    .controls button {
-      margin: 5px;
-      padding: 10px 15px;
-      font-size: 16px;
-      border: none;
-      border-radius: 6px;
-      background: #5c5db5;
-      color: white;
-      cursor: pointer;
-      transition: background 0.2s;
-    }
-    .controls button:hover {
-      background: #4647a3;
-    }
-    .input-group {
-      margin: 10px 0;
-    }
-    label {
-      margin-right: 10px;
-    }
-    select, input {
-      padding: 5px;
-      font-size: 14px;
-      border-radius: 5px;
-      border: none;
-    }
-  </style>
-</head>
-<body>
-  <h1>🏏 Rockets Cricket Club - Scorer Panel</h1>
+<script>
+  let score = 0, wickets = 0, balls = 0, overs = 0;
+  let striker = "None", nonStriker = "None", bowler = "None";
+  let battingTeam = null, bowlingTeam = null;
+  let tournamentData = JSON.parse(localStorage.getItem("tournamentData"));
+  let lastAction = null;
+  let firstInningsScore = null;
 
-  <div class="scoreboard">
-    <div class="input-group">
-      <label for="teamA">Team A:</label>
-      <input type="text" id="teamA" placeholder="Enter Team A">
-      <label for="teamB">Team B:</label>
-      <input type="text" id="teamB" placeholder="Enter Team B">
-    </div>
+  const scriptURL = "https://script.google.com/macros/s/AKfycbyYkUO01c9FpoLwGj_y8ALbPt2_WVvac_W1QxGNkqKnp54VRb6wBEPKmEzpOjuP-7fP6Q/exec";
 
-    <div class="input-group">
-      <label for="overs">Overs:</label>
-      <input type="number" id="overs" value="20">
-    </div>
+  function loadTeams() {
+    if (tournamentData) {
+      battingTeam = tournamentData.team1;
+      bowlingTeam = tournamentData.team2;
+      document.getElementById("teamName").innerText = battingTeam.name;
 
-    <h2 id="score">Score: 0/0 (0.0)</h2>
-    <h3 id="extras">Extras: 0</h3>
-  </div>
-
-  <div class="controls">
-    <button onclick="addRun(0)">0</button>
-    <button onclick="addRun(1)">1</button>
-    <button onclick="addRun(2)">2</button>
-    <button onclick="addRun(3)">3</button>
-    <button onclick="addRun(4)">4</button>
-    <button onclick="addRun(6)">6</button>
-    <button onclick="addWicket()">Wicket</button>
-    <button onclick="addExtra('Wide')">Wide</button>
-    <button onclick="addExtra('No Ball')">No Ball</button>
-    <button onclick="resetScore()">Reset</button>
-  </div>
-
-  <script>
-    let runs = 0;
-    let wickets = 0;
-    let balls = 0;
-    let extras = 0;
-    let maxOvers = 20;
-
-    const scoreEl = document.getElementById('score');
-    const extrasEl = document.getElementById('extras');
-
-    function updateDisplay() {
-      let overs = Math.floor(balls / 6);
-      let ballsRem = balls % 6;
-      scoreEl.textContent = `Score: ${runs}/${wickets} (${overs}.${ballsRem})`;
-      extrasEl.textContent = `Extras: ${extras}`;
+      populateDropdown("strikerSelect", battingTeam.players);
+      populateDropdown("nonStrikerSelect", battingTeam.players);
+      populateDropdown("bowlerSelect", bowlingTeam.players);
+    } else {
+      battingTeam = { name: "Team A", players: [] };
+      bowlingTeam = { name: "Team B", players: [] };
     }
+    updateDisplay();
+  }
 
-    function addRun(run) {
-      runs += run;
+  function populateDropdown(id, players) {
+    let dropdown = document.getElementById(id);
+    dropdown.innerHTML = "<option value=''>Select</option>";
+    players.forEach(p => {
+      if (p.trim()) {
+        let option = document.createElement("option");
+        option.value = p;
+        option.text = p;
+        dropdown.add(option);
+      }
+    });
+  }
+
+  function updateDisplay() {
+    document.getElementById("teamScore").innerText = 
+      `Score: ${score}/${wickets} (${overs}.${balls} overs)`;
+
+    let totalOvers = overs + balls / 6;
+    let nrr = totalOvers > 0 ? (score / totalOvers).toFixed(2) : "0.00";
+    document.getElementById("netRunRate").innerText = `NRR: ${nrr}`;
+    document.getElementById("currentBatting").innerText = 
+      `Currently batting: ${battingTeam ? battingTeam.name : "None"}`;
+    document.getElementById("currentPlayers").innerText = 
+      `Striker: ${striker} | Non-Striker: ${nonStriker}`;
+    document.getElementById("currentBowler").innerText = `Bowler: ${bowler}`;
+
+    saveToGoogleSheet(); // 🔥 Save live after every update
+  }
+
+  function applyRuns() {
+    let runs = parseInt(document.getElementById("runsSelect").value);
+    if (isNaN(runs)) return;
+    lastAction = { type: "runs", runs: runs };
+    addRuns(runs);
+  }
+
+  function addRuns(runs) {
+    score += runs;
+    balls++;
+    if (balls >= 6) { overs++; balls = 0; alert("Over completed. Please select next bowler."); }
+    if (runs % 2 !== 0) [striker, nonStriker] = [nonStriker, striker];
+    updateDisplay();
+  }
+
+  function applyExtras() {
+    let val = document.getElementById("extrasSelect").value;
+    if (!val) return;
+    let type = val.slice(0,2), runs = parseInt(val.slice(2));
+    lastAction = { type: "extra", subtype: type, runs: runs };
+    addExtra(type, runs);
+  }
+
+  function addExtra(type, runs) {
+    score += runs;
+    if (type === "lb") {
       balls++;
-      updateDisplay();
-      saveData();
+      if (balls >= 6) { overs++; balls = 0; alert("Over completed. Please select next bowler."); }
     }
+    updateDisplay();
+  }
 
-    function addWicket() {
-      wickets++;
-      balls++;
-      updateDisplay();
-      saveData();
+  function fallOfWicket() {
+    wickets++;
+    lastAction = { type: "wicket" };
+    striker = "Choose new striker";
+    updateDisplay();
+    alert("Wicket fallen! Please set new striker.");
+  }
+
+  function undoLast() {
+    if (!lastAction) return;
+    if (lastAction.type === "runs") {
+      score -= lastAction.runs;
+      if (balls === 0 && overs > 0) { overs--; balls = 5; } else { balls--; }
+    } else if (lastAction.type === "extra") {
+      score -= lastAction.runs;
+      if (lastAction.subtype === "lb") {
+        if (balls === 0 && overs > 0) { overs--; balls = 5; } else { balls--; }
+      }
+    } else if (lastAction.type === "wicket") {
+      wickets--;
+      striker = "None";
     }
+    lastAction = null;
+    updateDisplay();
+  }
 
-    function addExtra(type) {
-      extras++;
-      runs++;
-      // wides and no-balls don’t count as legal deliveries
-      updateDisplay();
-      saveData();
+  function setPlayers() {
+    if (document.getElementById("strikerSelect").value) striker = document.getElementById("strikerSelect").value;
+    if (document.getElementById("nonStrikerSelect").value) nonStriker = document.getElementById("nonStrikerSelect").value;
+    if (document.getElementById("bowlerSelect").value) bowler = document.getElementById("bowlerSelect").value;
+    updateDisplay();
+  }
+
+  function endOver() {
+    [striker, nonStriker] = [nonStriker, striker];
+    bowler = "Choose new bowler";
+    updateDisplay();
+    alert("Over ended! Please choose a new bowler.");
+    populateDropdown("bowlerSelect", bowlingTeam.players);
+  }
+
+  function endInnings() {
+    if (firstInningsScore === null) {
+      firstInningsScore = score;
+      alert(`Innings ended! ${battingTeam.name} scored ${score}.`);
+    } else {
+      let target = firstInningsScore + 1;
+      document.getElementById("targetMessage").innerText = 
+        `${battingTeam.name} needs ${target - score} more runs to win.`;
     }
+    [battingTeam, bowlingTeam] = [bowlingTeam, battingTeam];
+    score = 0; wickets = 0; balls = 0; overs = 0;
+    striker = "None"; nonStriker = "None"; bowler = "None";
+    document.getElementById("teamName").innerText = battingTeam.name;
+    populateDropdown("strikerSelect", battingTeam.players);
+    populateDropdown("nonStrikerSelect", battingTeam.players);
+    populateDropdown("bowlerSelect", bowlingTeam.players);
+    updateDisplay();
+  }
 
-    function resetScore() {
-      runs = 0;
-      wickets = 0;
-      balls = 0;
-      extras = 0;
-      updateDisplay();
-      saveData();
-    }
+  function resetMatch() {
+    score = 0; wickets = 0; balls = 0; overs = 0;
+    striker = "None"; nonStriker = "None"; bowler = "None";
+    firstInningsScore = null;
+    document.getElementById("targetMessage").innerText = "";
+    loadTeams();
+    alert("Match reset!");
+  }
 
-    function saveData() {
-      const teamA = document.getElementById('teamA').value || "Team A";
-      const teamB = document.getElementById('teamB').value || "Team B";
-      const overs = maxOvers;
-
-      fetch("https://script.google.com/macros/s/AKfycbyYkUO01c9FpoLwGj_y8ALbPt2_WVvac_W1QxGNkqKnp54VRb6wBEPKmEzpOjuP-7fP6Q/exec", {
+  // 🔥 Save function to Google Sheet
+  async function saveToGoogleSheet() {
+    try {
+      await fetch(scriptURL, {
         method: "POST",
         body: JSON.stringify({
-          teamA: teamA,
-          teamB: teamB,
-          runs: runs,
-          wickets: wickets,
-          balls: balls,
-          extras: extras,
-          overs: overs
+          team: battingTeam ? battingTeam.name : "Unknown",
+          score,
+          wickets,
+          overs: `${overs}.${balls}`,
+          striker,
+          nonStriker,
+          bowler
         }),
-        headers: {
-          "Content-Type": "application/json"
-        }
-      })
-      .then(res => res.text())
-      .then(msg => console.log("Saved:", msg))
-      .catch(err => console.error("Error:", err));
+        headers: { "Content-Type": "application/json" }
+      });
+    } catch (err) {
+      console.error("Error saving:", err);
     }
+  }
 
-    updateDisplay();
-  </script>
-</body>
-</html>
+  loadTeams();
+</script>
