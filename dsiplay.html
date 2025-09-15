@@ -5,61 +5,47 @@
   <title>Live Scoreboard</title>
   <style>
     body {
-      background-color: #111;
-      color: white;
       font-family: Arial, sans-serif;
+      background: black;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      flex-direction: column;
       text-align: center;
     }
-    .scoreboard {
-      margin: 30px auto;
-      padding: 20px;
-      background: #2a2a2a;
-      border-radius: 10px;
-      width: 500px;
-      box-shadow: 0 0 15px rgba(131,132,212,0.5);
-    }
-    #commentary {
-      margin-top: 15px;
-      padding: 10px;
-      background: #333;
-      border-radius: 8px;
-      color: #8384D4;
-      font-style: italic;
-      display: none;
-    }
+    h1 { font-size: 48px; margin-bottom: 20px; }
+    .score { font-size: 36px; }
   </style>
 </head>
 <body>
-  <h1>🏏 Rockets Cricket Club</h1>
-  <div class="scoreboard">
-    <h2 id="teamName">--</h2>
-    <p id="score">0/0 (0.0)</p>
-    <p>Striker: <span id="striker">-</span> | Non-Striker: <span id="nonstriker">-</span></p>
-    <p>Bowler: <span id="bowler">-</span></p>
-    <div id="commentary"></div>
-  </div>
+  <h1>🏏 Rockets Live Score</h1>
+  <div class="score" id="score">Loading...</div>
 
   <script>
-    function loadScore() {
-      const data = localStorage.getItem("scoreData");
-      if (!data) return;
-      const s = JSON.parse(data);
+    const sheetURL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vTKYF7NJFNdxUzNc9gYjMZfH0NvUOsp5NlH-tWTd1IcwqS5AwCkq8sBrCH8-ZEqzNIRmS8gPm-cpNVJ/pub?output=csv";
 
-      document.getElementById("teamName").innerText = s.teamName;
-      document.getElementById("score").innerText = `${s.runs}/${s.wickets} (${s.overs}.${s.balls})`;
-      document.getElementById("striker").innerText = s.striker;
-      document.getElementById("nonstriker").innerText = s.nonStriker;
-      document.getElementById("bowler").innerText = s.bowler;
+    async function fetchScore() {
+      try {
+        const response = await fetch(sheetURL);
+        const data = await response.text();
+        const rows = data.split("\n").map(r => r.split(","));
 
-      if (s.commentary) {
-        const comm = document.getElementById("commentary");
-        comm.innerText = s.commentary;
-        comm.style.display = "block";
-        setTimeout(() => { comm.style.display = "none"; }, 3000);
+        // Assume first row = headers: Runs, Wickets
+        const latest = rows[1]; // first data row
+        const runs = latest[0];
+        const wickets = latest[1];
+
+        document.getElementById("score").textContent = `${runs}/${wickets}`;
+      } catch (err) {
+        console.error("Error fetching sheet:", err);
+        document.getElementById("score").textContent = "Error loading score";
       }
     }
 
-    setInterval(loadScore, 1000); // auto-refresh every 1s
+    fetchScore();
+    setInterval(fetchScore, 5000); // refresh every 5s
   </script>
 </body>
 </html>
