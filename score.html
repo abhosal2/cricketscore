@@ -46,8 +46,9 @@
     <p id="score">Score: 0/0 (0.0 overs)</p>
     <p id="nrr">NRR: 0.00</p>
     <p id="batting">Currently batting: None</p>
-    <p id="striker">Striker: None | Non-Striker: None</p>
-    <p id="bowler">Bowler: None</p>
+    <p id="striker">Striker: None (0 runs, 0 balls)</p>
+    <p id="nonStriker">Non-Striker: None (0 runs, 0 balls)</p>
+    <p id="bowler">Bowler: None (0 runs, 0 wickets)</p>
   </div>
 
   <div class="controls">
@@ -73,23 +74,49 @@
     async function initScores() {
       if (!matchId) return;
 
-      // Insert a new row in scores table if not already present
-      const { data, error } = await supabaseClient
+      // Ensure base scores row exists
+      const { data: scoreRow } = await supabaseClient
         .from("scores")
         .select("*")
         .eq("match_id", matchId)
         .maybeSingle();
 
-      if (!data) {
+      if (!scoreRow) {
         await supabaseClient.from("scores").insert({
           match_id: matchId,
-          runs: 0,
-          wickets: 0,
-          overs: 0,
-          striker: null,
-          non_striker: null,
-          bowler: null,
+          runs: 0, wickets: 0, overs: 0,
+          striker: null, non_striker: null, bowler: null,
           commentary: "Match starting soon..."
+        });
+      }
+    }
+
+    async function ensureBatsman(player) {
+      if (!player || player === "None") return;
+      const { data } = await supabaseClient
+        .from("batting_stats")
+        .select("*")
+        .eq("match_id", matchId)
+        .eq("player_name", player)
+        .maybeSingle();
+      if (!data) {
+        await supabaseClient.from("batting_stats").insert({
+          match_id: matchId, player_name: player, runs: 0, balls: 0
+        });
+      }
+    }
+
+    async function ensureBowler(player) {
+      if (!player || player === "None") return;
+      const { data } = await supabaseClient
+        .from("bowling_stats")
+        .select("*")
+        .eq("match_id", matchId)
+        .eq("bowler_name", player)
+        .maybeSingle();
+      if (!data) {
+        await supabaseClient.from("bowling_stats").insert({
+          match_id: matchId, bowler_name: player, overs: 0, runs_conceded: 0, wickets: 0
         });
       }
     }
@@ -99,45 +126,98 @@
         `Score: ${runs}/${wickets} (${overs.toFixed(1)} overs)`;
       document.getElementById("nrr").textContent =
         `NRR: ${(overs > 0 ? (runs / overs).toFixed(2) : "0.00")}`;
-      document.getElementById("striker").textContent =
-        `Striker: ${striker} | Non-Striker: ${non_striker}`;
-      document.getElementById("bowler").textContent = `Bowler: ${bowler}`;
       document.getElementById("batting").textContent = `Currently batting: ${striker}`;
+
+      // Update striker stats
+      if (striker && striker !== "None") {
+        const { data: bat } = await supabaseClient
+          .from("batting_stats")
+          .select("runs, balls")
+          .eq("match_id", matchId)
+          .eq("player_name", striker)
+          .single();
+        document.getElementById("striker").textContent =
+          `Striker: ${striker} (${bat?.runs || 0} runs, ${bat?.balls || 0} balls)`;
+      }
+
+      // Update non-striker stats
+      if (non_striker && non_striker !== "None") {
+        const { data: bat2 } = await supabaseClient
+          .from("batting_stats")
+          .select("runs, balls")
+          .eq("match_id", matchId)
+          .eq("player_name", non_striker)
+          .single();
+        document.getElementById("nonStriker").textContent =
+          `Non-Striker: ${non_striker} (${bat2?.runs || 0} runs, ${bat2?.balls || 0} balls)`;
+      }
+
+      // Update bowler stats
+      if (bowler && bowler !== "None") {
+        const { data: bowl } = await supabaseClient
+          .from("bowling_stats")
+          .select("runs_conceded, wickets")
+          .eq("match_id", matchId)
+          .eq("bowler_name", bowler)
+          .single();
+        document.getElementById("bowler").textContent =
+          `Bowler: ${bowler} (${bowl?.runs_conceded || 0} runs, ${bowl?.wickets || 0} wickets)`;
+      }
 
       // Update Supabase scores table
       await supabaseClient
         .from("scores")
-        .update({
-          runs,
-          wickets,
-          overs,
-          striker,
-          non_striker,
-          bowler,
-          commentary
-        })
+        .update({ runs, wickets, overs, striker, non_striker, bowler, commentary })
         .eq("match_id", matchId);
     }
 
-    function addRun(r) {
+    async function addRun(r) {
       runs += r;
       commentary = `Batsman scored ${r} run(s)!`;
+
+      if (striker && striker !== "None") {
+        await ensureBatsman(striker);
+        await supabaseClient.rpc("increment_batting", { match_id_in: matchId, player_in: striker, runs_in: r });
+      }
+
+      if (bowler && bowler !== "None") {
+        await ensureBowler(bowler);
+        await supabaseClient.rpc("increment_bowling_runs", { match_id_in: matchId, bowler_in: bowler, runs_in: r });
+      }
+
       updateDisplay();
     }
 
-    function addWicket() {
+    async function addWicket() {
       wickets += 1;
       commentary = "Wicket falls!";
+
+      if (striker && striker !== "None") {
+        await supabaseClient
+          .from("batting_stats")
+          .update({ is_out: true })
+          .eq("match_id", matchId)
+          .eq("player_name", striker);
+      }
+
+      if (bowler && bowler !== "None") {
+        await ensureBowler(bowler);
+        await supabaseClient.rpc("increment_bowling_wickets", { match_id_in: matchId, bowler_in: bowler });
+      }
+
       updateDisplay();
     }
 
-    function addOver() {
+    async function addOver() {
       overs += 1.0;
       commentary = "Over completed.";
+      if (bowler && bowler !== "None") {
+        await ensureBowler(bowler);
+        await supabaseClient.rpc("increment_bowling_overs", { match_id_in: matchId, bowler_in: bowler });
+      }
       updateDisplay();
     }
 
-    // Initialize scoreboard row in scores
     initScores();
   </script>
 </body>
