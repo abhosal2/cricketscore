@@ -21,7 +21,7 @@
       text-shadow: 2px 2px 6px rgba(0,0,0,0.7);
     }
     .section {
-      background: rgba(30, 30, 30, 0.7); /* frosted glass */
+      background: rgba(30, 30, 30, 0.7);
       backdrop-filter: blur(8px);
       border-radius: 8px;
       padding: 20px;
@@ -84,6 +84,9 @@
       <input type="text" placeholder="Player 7">
       <input type="text" placeholder="Player 8">
     </div>
+
+    <label for="team1Captain">Captain</label>
+    <input type="text" id="team1Captain" placeholder="Enter Captain Name">
   </div>
 
   <div class="section">
@@ -102,6 +105,9 @@
       <input type="text" placeholder="Player 7">
       <input type="text" placeholder="Player 8">
     </div>
+
+    <label for="team2Captain">Captain</label>
+    <input type="text" id="team2Captain" placeholder="Enter Captain Name">
   </div>
 
   <div class="section">
@@ -121,14 +127,15 @@
     </select>
   </div>
 
-  <!-- Single save button -->
+  <!-- Buttons -->
   <button class="btn" onclick="saveTournament()">Save Tournament</button>
+  <button class="btn" onclick="window.location.href='score.html'">Go to Score Page</button>
 
   <!-- supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
     const SUPABASE_URL = "https://ukziqsqffdavuctzyngn.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVremlxc3FmZmRhdnVjdHp5bmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwMzA4MDQsImV4cCI6MjA3MzYwNjgwNH0.d8c2lnVKhoVLHHI3pKBLr9kaE1zB-ll5CjvFE8bZxQs";
+    const SUPABASE_ANON_KEY = "YOUR-ANON-KEY";
     const { createClient } = supabase;
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
@@ -137,21 +144,28 @@
       const team2Players = [...document.querySelectorAll("#team2Players input")].map(el => el.value.trim()).filter(Boolean);
 
       const t = {
-        team1: { name: document.getElementById('team1Name').value.trim(), players: team1Players },
-        team2: { name: document.getElementById('team2Name').value.trim(), players: team2Players },
+        team1: { 
+          name: document.getElementById('team1Name').value.trim(), 
+          players: team1Players,
+          captain: document.getElementById('team1Captain').value.trim()
+        },
+        team2: { 
+          name: document.getElementById('team2Name').value.trim(), 
+          players: team2Players,
+          captain: document.getElementById('team2Captain').value.trim()
+        },
         toss: {
           winner: document.getElementById('tossWinner').value,
           decision: document.getElementById('tossDecision').value
         }
       };
 
-      // Save locally
       localStorage.setItem('tournamentData', JSON.stringify(t));
 
-      // Save to Supabase
       try {
+        // Insert team1
         const { data: team1Data, error: e1 } = await supabaseClient
-          .from('teams').insert({ name: t.team1.name }).select().single();
+          .from('teams').insert({ name: t.team1.name, captain: t.team1.captain }).select().single();
         if (e1) throw e1;
 
         if (t.team1.players.length) {
@@ -159,8 +173,9 @@
             .insert(t.team1.players.map(p => ({ team_id: team1Data.id, name: p })));
         }
 
+        // Insert team2
         const { data: team2Data, error: e2 } = await supabaseClient
-          .from('teams').insert({ name: t.team2.name }).select().single();
+          .from('teams').insert({ name: t.team2.name, captain: t.team2.captain }).select().single();
         if (e2) throw e2;
 
         if (t.team2.players.length) {
@@ -168,6 +183,7 @@
             .insert(t.team2.players.map(p => ({ team_id: team2Data.id, name: p })));
         }
 
+        // Insert match
         const { data: matchRow, error: mErr } = await supabaseClient
           .from('matches')
           .insert({
