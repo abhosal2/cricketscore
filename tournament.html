@@ -7,19 +7,23 @@
   <style>
     body {
       font-family: "Copperplate Gothic Light", "Copperplate", Arial, sans-serif;
-      background: linear-gradient(135deg, #0d1b4c, #4b0f0f);
-      background-attachment: fixed;
-      background-size: cover;
+      margin: 0;
+      padding: 20px;
       color: #ffffff;
       text-align: center;
-      padding: 20px;
+      min-height: 100vh;
+      overflow-x: hidden;
     }
+
     h1 { 
       margin-bottom: 20px; 
       font-size: 28px;
       color: #ffffff;
       text-shadow: 2px 2px 6px rgba(0,0,0,0.7);
+      position: relative;
+      z-index: 2;
     }
+
     .section {
       background: rgba(30, 30, 30, 0.7);
       backdrop-filter: blur(8px);
@@ -28,12 +32,16 @@
       margin: 20px auto;
       max-width: 600px;
       box-shadow: 0 0 15px rgba(131,132,212,0.5);
+      position: relative;
+      z-index: 2;
     }
+
     label {
       display: block;
       margin: 10px 0 5px;
       font-weight: bold;
     }
+
     input[type="text"], select {
       width: 95%;
       padding: 8px;
@@ -44,12 +52,14 @@
       border-radius: 4px;
       font-family: "Copperplate Gothic Light", Arial, sans-serif;
     }
+
     .players-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 10px;
       margin: 10px 0;
     }
+
     .btn {
       background: rgba(30,30,30,0.8);
       border: 1px solid #444;
@@ -61,11 +71,57 @@
       display: block;
       font-family: "Copperplate Gothic Light", Arial, sans-serif;
       font-size: 16px;
+      position: relative;
+      z-index: 2;
     }
+
     .btn:hover { background: rgba(51,51,51,0.9); }
+
+    /* Cinematic glowing wall background */
+    .wall {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, 120px);
+      grid-auto-rows: 120px;
+      grid-gap: 15px;
+      pointer-events: none;
+      z-index: 0;
+      padding: 20px;
+      box-sizing: border-box;
+      filter: blur(4px) brightness(0.6); /* blur + dim */
+    }
+
+    .panel {
+      background: #111;
+      border: 2px solid rgba(255, 255, 255, 0.05);
+      animation: glowWave 3s infinite;
+    }
+
+    .panel:nth-child(2n) { --color: #ff7f00; } /* orange */
+    .panel:nth-child(2n+1) { --color: #007bff; } /* blue */
+
+    @keyframes glowWave {
+      0%, 100% {
+        box-shadow:
+          0 0 10px var(--color),
+          inset 0 0 6px rgba(255,255,255,0.1);
+      }
+      50% {
+        box-shadow:
+          0 0 25px var(--color),
+          inset 0 0 15px rgba(255,255,255,0.3);
+      }
+    }
   </style>
 </head>
 <body>
+  <!-- Glowing cinematic background -->
+  <div class="wall" id="wall"></div>
+
   <h1>Tournament Data</h1>
 
   <div class="section">
@@ -163,7 +219,6 @@
       localStorage.setItem('tournamentData', JSON.stringify(t));
 
       try {
-        // Insert team1
         const { data: team1Data, error: e1 } = await supabaseClient
           .from('teams').insert({ name: t.team1.name, captain: t.team1.captain }).select().single();
         if (e1) throw e1;
@@ -173,7 +228,6 @@
             .insert(t.team1.players.map(p => ({ team_id: team1Data.id, name: p })));
         }
 
-        // Insert team2
         const { data: team2Data, error: e2 } = await supabaseClient
           .from('teams').insert({ name: t.team2.name, captain: t.team2.captain }).select().single();
         if (e2) throw e2;
@@ -183,7 +237,6 @@
             .insert(t.team2.players.map(p => ({ team_id: team2Data.id, name: p })));
         }
 
-        // Insert match
         const { data: matchRow, error: mErr } = await supabaseClient
           .from('matches')
           .insert({
@@ -202,8 +255,24 @@
         alert('Error saving tournament. Check console for details.');
       }
     }
+
+    // Background wall panels
+    const wall = document.getElementById('wall');
+    function createPanels() {
+      wall.innerHTML = '';
+      const panelSize = 135; 
+      const cols = Math.ceil(window.innerWidth / panelSize);
+      const rows = Math.ceil(window.innerHeight / panelSize);
+      const total = cols * rows;
+      for(let i = 0; i < total; i++){
+        const panel = document.createElement('div');
+        panel.className = 'panel';
+        panel.style.animationDelay = (i * 0.1) + 's';
+        wall.appendChild(panel);
+      }
+    }
+    createPanels();
+    window.addEventListener('resize', createPanels);
   </script>
 </body>
 </html>
-
-
