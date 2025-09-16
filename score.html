@@ -11,7 +11,7 @@
       text-align: center;
       padding: 20px;
     }
-    .scoreboard, .controls {
+    .scoreboard, .controls, .selectors {
       background: #1e1e2f;
       padding: 20px;
       margin: 20px auto;
@@ -23,18 +23,28 @@
     h1, h2 {
       color: #8384D4;
     }
-    button {
+    select, button {
       margin: 5px;
       padding: 10px 20px;
       font-size: 16px;
       border-radius: 6px;
       border: none;
       cursor: pointer;
+    }
+    select {
+      background: #222;
+      color: white;
+    }
+    button {
       background: #8384D4;
       color: white;
     }
     button:hover {
       background: #6c6db8;
+    }
+    button:disabled {
+      background: #444;
+      cursor: not-allowed;
     }
   </style>
 </head>
@@ -47,18 +57,37 @@
     <p id="score">Score: 0/0 (0.0 overs)</p>
     <p id="nrr">NRR: 0.00</p>
     <p id="batting">Currently batting: None</p>
-    <p id="striker">Striker: None (0 runs, 0 balls)</p>
-    <p id="nonStriker">Non-Striker: None (0 runs, 0 balls)</p>
-    <p id="bowler">Bowler: None (0 runs, 0 wickets)</p>
+    <p id="striker">Striker: None</p>
+    <p id="nonStriker">Non-Striker: None</p>
+    <p id="bowler">Bowler: None</p>
   </div>
 
-  <div class="controls">
-    <button onclick="addRun(1)">+1 Run</button>
-    <button onclick="addRun(4)">+4 Runs</button>
-    <button onclick="addRun(6)">+6 Runs</button>
-    <button onclick="addWicket()">Wicket</button>
+  <!-- Player selectors -->
+  <div class="selectors" id="selectorsBox">
+    <h3>⚡ Select Players Before Scoring</h3>
+    <label>Striker:</label>
+    <select id="strikerSelect"><option value="">-- Select --</option></select>
     <br>
-    <button onclick="swapStrike()">Swap Strike</button>
+    <label>Non-Striker:</label>
+    <select id="nonStrikerSelect"><option value="">-- Select --</option></select>
+    <br>
+    <label>Bowler:</label>
+    <select id="bowlerSelect"><option value="">-- Select --</option></select>
+    <br><br>
+    <button onclick="confirmPlayers()">Confirm Players</button>
+  </div>
+
+  <!-- Scoring controls -->
+  <div class="controls">
+    <button id="btn1" onclick="addRun(1)" disabled>+1 Run</button>
+    <button id="btn4" onclick="addRun(4)" disabled>+4 Runs</button>
+    <button id="btn6" onclick="addRun(6)" disabled>+6 Runs</button>
+    <button id="btnW" onclick="addWicket()" disabled>Wicket</button>
+    <br>
+    <button id="btnSwap" onclick="swapStrike()" disabled>Swap Strike</button>
+    <button id="btnUndo" onclick="undo()" disabled>Undo</button>
+    <br><br>
+    <button id="btnEnd" onclick="endInnings()" disabled>End Innings</button>
     <br><br>
     <button onclick="window.location.href='display.html'">Go to Display Page</button>
   </div>
@@ -75,55 +104,84 @@
     let runs = 0, wickets = 0, overs = 0, balls = 0;
     let striker = "None", non_striker = "None", bowler = "None", commentary = "";
     let battingTeam = "", bowlingTeam = "";
+    let battingPlayers = [], bowlingPlayers = [];
+    let history = []; // undo stack
+    let waitingNewBatsman = false;
 
     async function initScores() {
       if (!matchId) return;
 
-      // Get match and team names
-      const { data: match, error: matchErr } = await supabaseClient
+      // Get match and team info (players + captains)
+      const { data: match } = await supabaseClient
         .from("matches")
-        .select("id, toss_winner, toss_decision, team1:team1_id(name), team2:team2_id(name)")
+        .select(`
+          id, toss_winner, toss_decision,
+          team1:team1_id(name, captain, players:players(name)),
+          team2:team2_id(name, captain, players:players(name))
+        `)
         .eq("id", matchId)
         .single();
 
-      if (matchErr) {
-        console.error("Error fetching match:", matchErr);
-        return;
-      }
+      if (!match) return;
 
-      // Determine batting & bowling team from toss decision
+      // Decide batting/bowling team
       if (match.toss_winner === "team1" && match.toss_decision === "bat") {
         battingTeam = match.team1.name;
         bowlingTeam = match.team2.name;
+        battingPlayers = match.team1.players.map(p => ({ name: p.name, captain: p.name === match.team1.captain }));
+        bowlingPlayers = match.team2.players.map(p => ({ name: p.name, captain: p.name === match.team2.captain }));
       } else if (match.toss_winner === "team1" && match.toss_decision === "bowl") {
         battingTeam = match.team2.name;
         bowlingTeam = match.team1.name;
+        battingPlayers = match.team2.players.map(p => ({ name: p.name, captain: p.name === match.team2.captain }));
+        bowlingPlayers = match.team1.players.map(p => ({ name: p.name, captain: p.name === match.team1.captain }));
       } else if (match.toss_winner === "team2" && match.toss_decision === "bat") {
         battingTeam = match.team2.name;
         bowlingTeam = match.team1.name;
+        battingPlayers = match.team2.players.map(p => ({ name: p.name, captain: p.name === match.team2.captain }));
+        bowlingPlayers = match.team1.players.map(p => ({ name: p.name, captain: p.name === match.team1.captain }));
       } else {
         battingTeam = match.team1.name;
         bowlingTeam = match.team2.name;
+        battingPlayers = match.team1.players.map(p => ({ name: p.name, captain: p.name === match.team1.captain }));
+        bowlingPlayers = match.team2.players.map(p => ({ name: p.name, captain: p.name === match.team2.captain }));
       }
 
       document.getElementById("battingTeam").textContent = "Batting Team: " + battingTeam;
       document.getElementById("bowlingTeam").textContent = "Bowling Team: " + bowlingTeam;
 
-      // Ensure base scores row exists
-      const { data: scoreRow } = await supabaseClient
-        .from("scores")
-        .select("*")
-        .eq("match_id", matchId)
-        .maybeSingle();
+      // Fill dropdowns
+      battingPlayers.forEach(p => {
+        const label = p.captain ? `${p.name} (C)` : p.name;
+        document.getElementById("strikerSelect").innerHTML += `<option value="${p.name}">${label}</option>`;
+        document.getElementById("nonStrikerSelect").innerHTML += `<option value="${p.name}">${label}</option>`;
+      });
 
-      if (!scoreRow) {
-        await supabaseClient.from("scores").insert({
-          match_id: matchId,
-          runs: 0, wickets: 0, overs: 0,
-          striker: null, non_striker: null, bowler: null,
-          commentary: "Match starting soon..."
-        });
+      bowlingPlayers.forEach(p => {
+        const label = p.captain ? `${p.name} (C)` : p.name;
+        document.getElementById("bowlerSelect").innerHTML += `<option value="${p.name}">${label}</option>`;
+      });
+    }
+
+    function confirmPlayers() {
+      striker = document.getElementById("strikerSelect").value;
+      non_striker = document.getElementById("nonStrikerSelect").value;
+      bowler = document.getElementById("bowlerSelect").value;
+
+      if (!striker || !non_striker || !bowler) {
+        alert("Please select striker, non-striker, and bowler before scoring!");
+        return;
       }
+
+      commentary = "Match begins!";
+      enableScoring();
+      updateDisplay();
+    }
+
+    function enableScoring() {
+      ["btn1","btn4","btn6","btnW","btnSwap","btnEnd","btnUndo"].forEach(id=>{
+        document.getElementById(id).disabled = false;
+      });
     }
 
     async function updateDisplay() {
@@ -132,56 +190,105 @@
       document.getElementById("nrr").textContent =
         `NRR: ${(overs + balls/6 > 0 ? (runs / (overs + balls/6)).toFixed(2) : "0.00")}`;
       document.getElementById("batting").textContent = `Currently batting: ${striker}`;
-      document.getElementById("striker").textContent =
-        `Striker: ${striker} (stats updated in DB)`;
-      document.getElementById("nonStriker").textContent =
-        `Non-Striker: ${non_striker} (stats updated in DB)`;
-      document.getElementById("bowler").textContent =
-        `Bowler: ${bowler} (stats updated in DB)`;
+      document.getElementById("striker").textContent = `Striker: ${striker}`;
+      document.getElementById("nonStriker").textContent = `Non-Striker: ${non_striker}`;
+      document.getElementById("bowler").textContent = `Bowler: ${bowler}`;
 
-      // Save to Supabase
       await supabaseClient
         .from("scores")
         .update({ runs, wickets, overs: overs + balls/6, striker, non_striker, bowler, commentary })
         .eq("match_id", matchId);
     }
 
-    async function addRun(r) {
+    function addRun(r) {
+      if (waitingNewBatsman) {
+        alert("Please select a new batsman before continuing!");
+        return;
+      }
+      history.push({ type: "run", runs: r, balls });
       runs += r;
-      balls += 1;
-      commentary = `Batsman scored ${r} run(s)!`;
-
+      balls++;
       if (balls === 6) {
-        overs += 1;
+        overs++;
         balls = 0;
-        commentary += " Over completed.";
         swapStrike();
       }
+      commentary = `${striker} scores ${r} run(s)!`;
+      updateDisplay();
+    }
+
+    function addWicket() {
+      if (waitingNewBatsman) {
+        alert("Please select a new batsman before continuing!");
+        return;
+      }
+      history.push({ type: "wicket", balls });
+      wickets++;
+      balls++;
+      commentary = "Wicket falls! Select a new batsman.";
+
+      // force scorer to pick replacement striker
+      waitingNewBatsman = true;
+      document.getElementById("strikerSelect").disabled = false;
+      document.getElementById("selectorsBox").style.border = "2px solid red";
 
       updateDisplay();
     }
 
-    async function addWicket() {
-      wickets += 1;
-      balls += 1;
-      commentary = "Wicket falls!";
-
-      if (balls === 6) {
-        overs += 1;
-        balls = 0;
-        commentary += " Over completed.";
-        swapStrike();
+    function setNewBatsman() {
+      const newBat = document.getElementById("strikerSelect").value;
+      if (!newBat) {
+        alert("Select a new batsman!");
+        return;
       }
-
+      striker = newBat;
+      waitingNewBatsman = false;
+      document.getElementById("selectorsBox").style.border = "none";
+      commentary = `${newBat} comes to the crease.`;
       updateDisplay();
     }
 
     function swapStrike() {
-      let temp = striker;
-      striker = non_striker;
-      non_striker = temp;
+      history.push({ type: "swap" });
+      [striker, non_striker] = [non_striker, striker];
       commentary = "Batsmen swapped ends.";
       updateDisplay();
+    }
+
+    function undo() {
+      const last = history.pop();
+      if (!last) return;
+      if (last.type === "run") {
+        runs -= last.runs;
+        balls = last.balls;
+      } else if (last.type === "wicket") {
+        wickets -= 1;
+        balls = last.balls;
+        waitingNewBatsman = false;
+        document.getElementById("selectorsBox").style.border = "none";
+      } else if (last.type === "swap") {
+        [striker, non_striker] = [non_striker, striker];
+      }
+      commentary = "Last action undone.";
+      updateDisplay();
+    }
+
+    function endInnings() {
+      [battingTeam, bowlingTeam] = [bowlingTeam, battingTeam];
+      runs = wickets = overs = balls = 0;
+      striker = non_striker = bowler = "None";
+      commentary = "Innings ended. Teams swapped!";
+      document.getElementById("battingTeam").textContent = "Batting Team: " + battingTeam;
+      document.getElementById("bowlingTeam").textContent = "Bowling Team: " + bowlingTeam;
+
+      disableScoring();
+      updateDisplay();
+    }
+
+    function disableScoring() {
+      ["btn1","btn4","btn6","btnW","btnSwap","btnEnd","btnUndo"].forEach(id=>{
+        document.getElementById(id).disabled = true;
+      });
     }
 
     initScores();
