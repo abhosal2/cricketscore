@@ -2,48 +2,40 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>🏏 Live Match Scoreboard</title>
-  <link href="https://fonts.googleapis.com/css2?family=Centaur:wght@400&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Match Scoreboard</title>
   <style>
     body {
       font-family: "Centaur", serif;
-      background: radial-gradient(circle at top left, rgba(20,30,60,0.95), rgba(10,10,10,0.95)),
-                  url('bat-ball-glow.png') no-repeat center center fixed;
-      background-size: cover;
+      background-color: #000; /* Solid black background */
       color: white;
       text-align: center;
       padding: 20px;
     }
-    .scoreboard {
-      background: rgba(30, 30, 30, 0.8);
-      border-radius: 12px;
-      padding: 20px;
-      margin: 20px auto;
-      width: 80%;
-      max-width: 700px;
-      box-shadow: 0px 0px 15px rgba(131,132,212,0.6);
-    }
     h1 {
-      font-size: 28px;
-      color: #ffcc00;
-      text-shadow: 0px 0px 8px rgba(255,200,0,0.7);
+      font-size: 32px;
+      margin-bottom: 20px;
+      text-shadow: 0 0 8px rgba(255,255,255,0.5);
     }
-    h2 {
-      font-size: 22px;
-      margin-bottom: 10px;
+    .scoreboard {
+      background: rgba(30,30,30,0.85);
+      border-radius: 10px;
+      padding: 20px;
+      max-width: 500px;
+      margin: 0 auto;
+      box-shadow: 0 0 15px rgba(255,255,255,0.2);
     }
-    p {
+    .line {
+      margin: 10px 0;
       font-size: 18px;
-      margin: 8px 0;
     }
     .commentary {
-      background: rgba(50, 50, 50, 0.85);
-      border-radius: 10px;
-      padding: 15px;
       margin-top: 20px;
-      font-size: 18px;
-      color: #ffdddd;
-      box-shadow: 0 0 10px rgba(200,50,50,0.6);
+      padding: 15px;
+      background: rgba(50,50,50,0.9);
+      border-radius: 8px;
+      font-style: italic;
+      box-shadow: inset 0 0 8px rgba(255,255,255,0.2);
     }
   </style>
 </head>
@@ -51,86 +43,63 @@
   <h1>🏏 Live Match Scoreboard</h1>
 
   <div class="scoreboard">
-    <h2 id="teamName">Team</h2>
-    <p id="teamScore">Score: 0/0 (0.0 overs)</p>
-    <p id="netRunRate">NRR: 0.00</p>
-    <p id="targetMessage"></p>
-    <p id="currentBatting">Currently batting: None</p>
-    <p id="currentPlayers">Striker: None | Non-Striker: None</p>
-    <p id="currentBowler">Bowler: None</p>
-  </div>
-
-  <div class="commentary">
-    📢 <span id="commentaryText">Simple commentary / announcements will appear here.</span>
+    <div class="line"><strong>Team:</strong> <span id="teamName">Loading...</span></div>
+    <div class="line"><strong>Score:</strong> <span id="score">0/0 (0.0 overs)</span></div>
+    <div class="line"><strong>NRR:</strong> <span id="nrr">0.00</span></div>
+    <div class="line"><strong>Currently batting:</strong> <span id="batting">None</span></div>
+    <div class="line"><strong>Striker:</strong> <span id="striker">None</span> | 
+                 <strong>Non-Striker:</strong> <span id="nonStriker">None</span></div>
+    <div class="line"><strong>Bowler:</strong> <span id="bowler">None</span></div>
+    <div class="commentary" id="commentary">📢 Commentary will appear here...</div>
   </div>
 
   <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    // Supabase project settings
     const SUPABASE_URL = "https://ukziqsqffdavuctzyngn.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVremlxc3FmZmRhdnVjdHp5bmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwMzA4MDQsImV4cCI6MjA3MzYwNjgwNH0.d8c2lnVKhoVLHHI3pKBLr9kaE1zB-ll5CjvFE8bZxQs"; // replace with your anon key
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVremlxc3FmZmRhdnVjdHp5bmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwMzA4MDQsImV4cCI6MjA3MzYwNjgwNH0.d8c2lnVKhoVLHHI3pKBLr9kaE1zB-ll5CjvFE8bZxQs";
     const { createClient } = supabase;
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    // matchId is stored in localStorage by tournament.html
     const matchId = localStorage.getItem("matchId");
 
-    async function loadDisplayData() {
+    async function loadScoreboard() {
       if (!matchId) {
-        console.error("No matchId found in localStorage.");
+        console.error("No matchId found in localStorage");
         return;
       }
 
-      // fetch latest match row
-      const { data: matchData, error: matchError } = await supabaseClient
-        .from("matches")
-        .select(`
-          id,
-          team1:team1_id(name),
-          team2:team2_id(name),
-          toss_winner,
-          toss_decision,
-          score,
-          wickets,
-          overs,
-          striker,
-          non_striker,
-          bowler,
-          commentary
-        `)
-        .eq("id", matchId)
+      // fetch score row for this match
+      const { data, error } = await supabaseClient
+        .from("scores")
+        .select("*")
+        .eq("match_id", matchId)
         .single();
 
-      if (matchError) {
-        console.error("Error loading match:", matchError);
+      if (error) {
+        console.error("Error loading match:", error);
         return;
       }
 
-      // update DOM with match data
-      document.getElementById("teamName").innerText = matchData.team1?.name || "Team";
-      document.getElementById("teamScore").innerText =
-        `Score: ${matchData.score || 0}/${matchData.wickets || 0} (${matchData.overs || "0.0"} overs)`;
-
-      let totalOvers = parseFloat(matchData.overs || 0);
-      let nrr = totalOvers > 0 ? (matchData.score / totalOvers).toFixed(2) : "0.00";
-      document.getElementById("netRunRate").innerText = `NRR: ${nrr}`;
-
-      document.getElementById("currentBatting").innerText =
-        `Currently batting: ${matchData.team1?.name || "None"}`;
-      document.getElementById("currentPlayers").innerText =
-        `Striker: ${matchData.striker || "None"} | Non-Striker: ${matchData.non_striker || "None"}`;
-      document.getElementById("currentBowler").innerText =
-        `Bowler: ${matchData.bowler || "None"}`;
-
-      document.getElementById("commentaryText").innerText =
-        matchData.commentary || "Simple commentary / announcements will appear here.";
+      // Update DOM
+      document.getElementById("teamName").textContent = "Match " + matchId;
+      document.getElementById("score").textContent =
+        `${data.runs}/${data.wickets} (${data.overs} overs)`;
+      document.getElementById("nrr").textContent = (data.overs > 0) 
+        ? (data.runs / data.overs).toFixed(2) 
+        : "0.00";
+      document.getElementById("batting").textContent = data.striker || "None";
+      document.getElementById("striker").textContent = data.striker || "None";
+      document.getElementById("nonStriker").textContent = data.non_striker || "None";
+      document.getElementById("bowler").textContent = data.bowler || "None";
+      document.getElementById("commentary").textContent = data.commentary || "📢 Waiting for updates...";
     }
 
-    // refresh every 3 seconds
-    setInterval(loadDisplayData, 3000);
-    loadDisplayData();
+    // Initial load
+    loadScoreboard();
+
+    // Poll every 5 seconds for updates
+    setInterval(loadScoreboard, 5000);
   </script>
 </body>
 </html>
-
