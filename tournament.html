@@ -3,22 +3,30 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tournament Setup</title>
+  <title>Tournament Data</title>
   <style>
     body {
-      font-family: Arial, sans-serif;
-      background-color: #121212;
+      font-family: "Copperplate Gothic Light", "Copperplate", Arial, sans-serif;
+      background: url('https://www.deviantart.com/asat103/art/Peacemaker-904835382') no-repeat center center fixed;
+      background-size: cover;
       color: #ffffff;
       text-align: center;
       padding: 20px;
     }
-    h1 { margin-bottom: 20px; }
+    h1 { 
+      margin-bottom: 20px; 
+      font-size: 28px;
+      color: #ffffff;
+      text-shadow: 2px 2px 6px rgba(0,0,0,0.7);
+    }
     .section {
-      background: #1e1e1e;
+      background: rgba(30, 30, 30, 0.7); /* frosted glass effect */
+      backdrop-filter: blur(8px);
       border-radius: 8px;
       padding: 20px;
       margin: 20px auto;
       max-width: 500px;
+      box-shadow: 0 0 15px rgba(131,132,212,0.5);
     }
     label {
       display: block;
@@ -29,25 +37,27 @@
       width: 100%;
       padding: 8px;
       margin-bottom: 15px;
-      background: #2a2a2a;
+      background: rgba(42,42,42,0.9);
       border: 1px solid #444;
       color: #fff;
       border-radius: 4px;
+      font-family: "Copperplate Gothic Light", Arial, sans-serif;
     }
     .btn {
-      background: #1e1e1e;
+      background: rgba(30,30,30,0.8);
       border: 1px solid #444;
       padding: 10px 20px;
       color: #fff;
       cursor: pointer;
       border-radius: 4px;
       margin: 10px 5px;
+      font-family: "Copperplate Gothic Light", Arial, sans-serif;
     }
-    .btn:hover { background: #333; }
+    .btn:hover { background: rgba(51,51,51,0.9); }
   </style>
 </head>
 <body>
-  <h1>Cricket Tournament Setup</h1>
+  <h1>Tournament Data</h1>
 
   <div class="section">
     <h2>Team 1</h2>
@@ -91,7 +101,6 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
   <script>
-    // replace with your Supabase values
     const SUPABASE_URL = "https://ukziqsqffdavuctzyngn.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVremlxc3FmZmRhdnVjdHp5bmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwMzA4MDQsImV4cCI6MjA3MzYwNjgwNH0.d8c2lnVKhoVLHHI3pKBLr9kaE1zB-ll5CjvFE8bZxQs";
     const { createClient } = supabase;
