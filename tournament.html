@@ -2,204 +2,166 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Tournament Setup - Rockets Cricket Club</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tournament Setup</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #0F2447;
-      color: white;
-      padding: 30px;
+      background-color: #121212;
+      color: #ffffff;
       text-align: center;
+      padding: 20px;
     }
-    h1, h2 {
-      font-family: "Copperplate Gothic Light", "Copperplate", Arial, sans-serif;
-      font-size: 24px;
+    h1 {
       margin-bottom: 20px;
     }
-    .team-section {
-      background: #1a3570;
+    .section {
+      background: #1e1e1e;
+      border-radius: 8px;
       padding: 20px;
       margin: 20px auto;
-      border-radius: 12px;
-      width: 80%;
-      max-width: 700px;
-      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+      max-width: 500px;
     }
     label {
       display: block;
-      margin-top: 10px;
-      font-size: 14px;
-      text-align: left;
+      margin: 10px 0 5px;
+      font-weight: bold;
     }
-    input {
+    input[type="text"], textarea {
+      width: 100%;
       padding: 8px;
-      margin: 6px 0;
-      border: none;
-      border-radius: 6px;
-      width: 95%;
-      font-size: 14px;
+      margin-bottom: 15px;
+      background: #2a2a2a;
+      border: 1px solid #444;
+      color: #fff;
+      border-radius: 4px;
     }
-    .players-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 15px;
-    }
-    button {
-      padding: 12px 20px;
-      margin-top: 20px;
-      background: #8384D4;
-      color: white;
-      border: none;
-      border-radius: 8px;
-      font-size: 16px;
+    .btn {
+      background: #1e1e1e;
+      border: 1px solid #444;
+      padding: 10px 20px;
+      color: #fff;
       cursor: pointer;
+      border-radius: 4px;
+      margin-top: 10px;
     }
-    button:hover {
-      background: #6a6bc0;
+    .btn:hover {
+      background: #333;
     }
   </style>
 </head>
 <body>
-  <h1>🏏 Tournament Setup</h1>
+  <h1>Cricket Tournament Setup</h1>
 
-  <!-- Team 1 -->
-  <div class="team-section">
+  <div class="section">
     <h2>Team 1</h2>
-    <label>Team Name</label>
+    <label for="team1Name">Team Name</label>
     <input type="text" id="team1Name" placeholder="Enter Team 1 Name">
-
-    <label>Players (Max 8)</label>
-    <div class="players-grid">
-      <input type="text" id="team1Player1" placeholder="Player 1">
-      <input type="text" id="team1Player2" placeholder="Player 2">
-      <input type="text" id="team1Player3" placeholder="Player 3">
-      <input type="text" id="team1Player4" placeholder="Player 4">
-      <input type="text" id="team1Player5" placeholder="Player 5">
-      <input type="text" id="team1Player6" placeholder="Player 6">
-      <input type="text" id="team1Player7" placeholder="Player 7">
-      <input type="text" id="team1Player8" placeholder="Player 8">
-    </div>
-
-    <label>Captain (must be one of above)</label>
-    <input type="text" id="team1Captain" placeholder="Enter Captain Name">
+    <label for="team1Players">Players (comma separated)</label>
+    <textarea id="team1Players" rows="3" placeholder="Player1, Player2, ..."></textarea>
   </div>
 
-  <!-- Team 2 -->
-  <div class="team-section">
+  <div class="section">
     <h2>Team 2</h2>
-    <label>Team Name</label>
+    <label for="team2Name">Team Name</label>
     <input type="text" id="team2Name" placeholder="Enter Team 2 Name">
-
-    <label>Players (Max 8)</label>
-    <div class="players-grid">
-      <input type="text" id="team2Player1" placeholder="Player 1">
-      <input type="text" id="team2Player2" placeholder="Player 2">
-      <input type="text" id="team2Player3" placeholder="Player 3">
-      <input type="text" id="team2Player4" placeholder="Player 4">
-      <input type="text" id="team2Player5" placeholder="Player 5">
-      <input type="text" id="team2Player6" placeholder="Player 6">
-      <input type="text" id="team2Player7" placeholder="Player 7">
-      <input type="text" id="team2Player8" placeholder="Player 8">
-    </div>
-
-    <label>Captain (must be one of above)</label>
-    <input type="text" id="team2Captain" placeholder="Enter Captain Name">
+    <label for="team2Players">Players (comma separated)</label>
+    <textarea id="team2Players" rows="3" placeholder="Player1, Player2, ..."></textarea>
   </div>
 
-  <button onclick="saveTournament()">Save Tournament</button>
-  <button onclick="goToScore()">Go to Score Page</button>
+  <div class="section">
+    <h2>Toss</h2>
+    <label for="tossWinner">Toss Winner (team1 or team2)</label>
+    <input type="text" id="tossWinner" placeholder="team1 or team2">
+    <label for="tossDecision">Toss Decision (bat or bowl)</label>
+    <input type="text" id="tossDecision" placeholder="bat or bowl">
+  </div>
 
-  <!-- Supabase client -->
+  <button class="btn" onclick="saveLocalTournament()">Save Locally</button>
+  <button class="btn" onclick="saveTournamentToSupabase()">Save to Supabase</button>
+
+  <!-- supabase client (v2) via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script>
-    const SUPABASE_URL = "https://ukziqsqffdavuctzyngn.supabase.co";
-    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVremlxc3FmZmRhdnVjdHp5bmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwMzA4MDQsImV4cCI6MjA3MzYwNjgwNH0.d8c2lnVKhoVLHHI3pKBLr9kaE1zB-ll5CjvFE8bZxQs"; // Replace with your real key
-    const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    async function saveTournament() {
-      // Gather form data
-      let tournamentData = {
+  <script>
+    // replace with values from your Supabase project Settings → API
+    const SUPABASE_URL = "https://ukziqsqffdavuctzyngn.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVremlxc3FmZmRhdnVjdHp5bmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwMzA4MDQsImV4cCI6MjA3MzYwNjgwNH0.d8c2lnVKhoVLHHI3pKBLr9kaE1zB-ll5CjvFE8bZxQs";
+
+    const { createClient } = supabase;
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    function saveLocalTournament() {
+      const t = {
         team1: {
-          name: document.getElementById('team1Name').value,
-          players: [
-            document.getElementById('team1Player1').value,
-            document.getElementById('team1Player2').value,
-            document.getElementById('team1Player3').value,
-            document.getElementById('team1Player4').value,
-            document.getElementById('team1Player5').value,
-            document.getElementById('team1Player6').value,
-            document.getElementById('team1Player7').value,
-            document.getElementById('team1Player8').value
-          ].filter(Boolean),
-          captain: document.getElementById('team1Captain').value
+          name: document.getElementById('team1Name').value.trim(),
+          players: document.getElementById('team1Players').value.split(',').map(p => p.trim())
         },
         team2: {
-          name: document.getElementById('team2Name').value,
-          players: [
-            document.getElementById('team2Player1').value,
-            document.getElementById('team2Player2').value,
-            document.getElementById('team2Player3').value,
-            document.getElementById('team2Player4').value,
-            document.getElementById('team2Player5').value,
-            document.getElementById('team2Player6').value,
-            document.getElementById('team2Player7').value,
-            document.getElementById('team2Player8').value
-          ].filter(Boolean),
-          captain: document.getElementById('team2Captain').value
+          name: document.getElementById('team2Name').value.trim(),
+          players: document.getElementById('team2Players').value.split(',').map(p => p.trim())
+        },
+        toss: {
+          winner: document.getElementById('tossWinner').value.trim(),
+          decision: document.getElementById('tossDecision').value.trim()
         }
       };
-
-      // Save to localStorage (existing functionality)
-      localStorage.setItem("tournamentData", JSON.stringify(tournamentData));
-      alert("Tournament Data Saved Locally!");
-
-      // Insert into Supabase
-      try {
-        // Insert teams
-        const { data: team1Data, error: t1Err } = await supabase
-          .from('teams')
-          .insert([{ name: tournamentData.team1.name, captain: tournamentData.team1.captain }])
-          .select();
-        if (t1Err) throw t1Err;
-
-        const { data: team2Data, error: t2Err } = await supabase
-          .from('teams')
-          .insert([{ name: tournamentData.team2.name, captain: tournamentData.team2.captain }])
-          .select();
-        if (t2Err) throw t2Err;
-
-        // Insert players
-        for (let p of tournamentData.team1.players) {
-          await supabase.from('players').insert([{ name: p, team_id: team1Data[0].id }]);
-        }
-        for (let p of tournamentData.team2.players) {
-          await supabase.from('players').insert([{ name: p, team_id: team2Data[0].id }]);
-        }
-
-        // Create a match record linking the two teams
-        await supabase.from('matches').insert([{
-          team1_id: team1Data[0].id,
-          team2_id: team2Data[0].id,
-          status: 'scheduled'
-        }]);
-
-        alert("Tournament Data Saved to Supabase!");
-      } catch (err) {
-        console.error("Supabase Error:", err);
-        alert("Error saving to database. Check console for details.");
-      }
+      localStorage.setItem('tournamentData', JSON.stringify(t));
+      alert('Tournament data saved locally!');
     }
 
-    function goToScore() {
-      let inputs = document.querySelectorAll("input");
-      for (let input of inputs) {
-        if (input.value.trim() === "") {
-          alert("⚠️ Please fill all fields before proceeding!");
-          return;
-        }
+    async function saveTournamentToSupabase() {
+      const t = JSON.parse(localStorage.getItem("tournamentData") || "{}");
+      if (!t || !t.team1 || !t.team2) {
+        alert("No local tournamentData. Save locally first.");
+        return;
       }
-      window.location.href = "score.html";
+
+      // create team1
+      const { data: team1Data, error: e1 } = await supabaseClient
+        .from('teams').insert({ name: t.team1.name }).select().single();
+      if (e1) return console.error('Team1 Error:', e1);
+
+      // create players for team1
+      const team1Players = t.team1.players
+        .filter(p => p && p.trim())
+        .map(p => ({ team_id: team1Data.id, name: p.trim() }));
+      if (team1Players.length) {
+        await supabaseClient.from('players').insert(team1Players);
+      }
+
+      // team2
+      const { data: team2Data, error: e2 } = await supabaseClient
+        .from('teams').insert({ name: t.team2.name }).select().single();
+      if (e2) return console.error('Team2 Error:', e2);
+
+      const team2Players = t.team2.players
+        .filter(p => p && p.trim())
+        .map(p => ({ team_id: team2Data.id, name: p.trim() }));
+      if (team2Players.length) {
+        await supabaseClient.from('players').insert(team2Players);
+      }
+
+      // toss winner normalization
+      const tossWinnerRaw = (t.toss && t.toss.winner) || t.tossWinner || null;
+      let tossWinner = tossWinnerRaw;
+      if (tossWinnerRaw === "team1") tossWinner = "team1";
+      else if (tossWinnerRaw === "team2") tossWinner = "team2";
+
+      // create match
+      const { data: matchRow, error: mErr } = await supabaseClient
+        .from('matches')
+        .insert({
+          team1_id: team1Data.id,
+          team2_id: team2Data.id,
+          toss_winner: tossWinner,
+          toss_decision: (t.toss && t.toss.decision) || t.decision || null
+        }).select().single();
+
+      if (mErr) return console.error('Match Error:', mErr);
+
+      localStorage.setItem('matchId', String(matchRow.id));
+      alert('Saved to Supabase (matchId=' + matchRow.id + ')');
     }
   </script>
 </body>
