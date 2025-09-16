@@ -63,25 +63,7 @@
 
     const matchId = localStorage.getItem("matchId");
 
-    async function loadScoreboard() {
-      if (!matchId) {
-        console.error("No matchId found in localStorage");
-        return;
-      }
-
-      // fetch score row for this match
-      const { data, error } = await supabaseClient
-        .from("scores")
-        .select("*")
-        .eq("match_id", matchId)
-        .single();
-
-      if (error) {
-        console.error("Error loading match:", error);
-        return;
-      }
-
-      // Update DOM
+    function updateUI(data) {
       document.getElementById("teamName").textContent = "Match " + matchId;
       document.getElementById("score").textContent =
         `${data.runs}/${data.wickets} (${data.overs} overs)`;
@@ -95,12 +77,33 @@
       document.getElementById("commentary").textContent = data.commentary || "📢 Waiting for updates...";
     }
 
-    // Initial load
-    loadScoreboard();
+    async function loadInitial() {
+      if (!matchId) return;
+      const { data, error } = await supabaseClient
+        .from("scores")
+        .select("*")
+        .eq("match_id", matchId)
+        .single();
 
-    // Poll every 5 seconds for updates
-    setInterval(loadScoreboard, 5000);
+      if (data) updateUI(data);
+    }
+
+    // Subscribe to realtime updates for this match
+    function subscribeToUpdates() {
+      supabaseClient
+        .channel("score_updates_" + matchId)
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "scores", filter: `match_id=eq.${matchId}` },
+          (payload) => {
+            updateUI(payload.new);
+          }
+        )
+        .subscribe();
+    }
+
+    loadInitial();
+    subscribeToUpdates();
   </script>
 </body>
 </html>
-
