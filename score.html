@@ -6,7 +6,7 @@
   <style>
     body {
       font-family: Arial, sans-serif;
-      background-color: #1a1a1a;   /* <-- Dark grey / black background */
+      background-color: #1a1a1a;   /* dark grey / black */
       color: white;
       text-align: center;
       padding: 20px;
@@ -122,45 +122,104 @@
     let score = 0, wickets = 0, balls = 0, overs = 0;
     let striker = "None", nonStriker = "None", bowler = "None";
     let battingTeam = null, bowlingTeam = null;
-    let tournamentData = JSON.parse(localStorage.getItem("tournamentData"));
     let lastAction = null;
     let firstInningsScore = null;
 
-    // *** Updated: Choose batting team based on toss winner ***
-    function loadTeams() {
-      if (tournamentData) {
-        // If tournamentData contains a 'tossWinner' and 'decision'
-        const tossWinner = tournamentData.tossWinner;
-        const decision   = tournamentData.decision; // "bat" or "bowl"
-
-        // If toss winner decides to bat, they bat first. Otherwise the other team bats.
-        if (decision === "bat") {
-          battingTeam = tossWinner === "team1" ? tournamentData.team1 : tournamentData.team2;
-          bowlingTeam = tossWinner === "team1" ? tournamentData.team2 : tournamentData.team1;
-        } else {
-          battingTeam = tossWinner === "team1" ? tournamentData.team2 : tournamentData.team1;
-          bowlingTeam = tossWinner === "team1" ? tournamentData.team1 : tournamentData.team2;
-        }
-
-        document.getElementById("teamName").innerText = battingTeam.name;
-        populateDropdown("strikerSelect", battingTeam.players);
-        populateDropdown("nonStrikerSelect", battingTeam.players);
-        populateDropdown("bowlerSelect", bowlingTeam.players);
-      } else {
-        battingTeam = { name: "Team A", players: [] };
-        bowlingTeam = { name: "Team B", players: [] };
+    // safe loader: parse tournamentData from localStorage each time we (re)load teams
+    function safeGetTournamentData() {
+      try {
+        return JSON.parse(localStorage.getItem("tournamentData") || "null");
+      } catch (e) {
+        console.error("Error parsing tournamentData:", e);
+        return null;
       }
+    }
+
+    // normalize decision strings
+    function normalizeDecision(d) {
+      if (!d) return null;
+      d = String(d).trim().toLowerCase();
+      if (d.startsWith("bat")) return "bat";
+      if (d.startsWith("bowl")) return "bowl";
+      if (d === "b") return "bat"; // be forgiving
+      return null;
+    }
+
+    // *** Robust loadTeams: supports multiple tournamentData shapes ***
+    function loadTeams() {
+      const tournamentData = safeGetTournamentData();
+
+      // fallback defaults
+      let team1 = { name: "Team 1", players: [] };
+      let team2 = { name: "Team 2", players: [] };
+
+      if (tournamentData && tournamentData.team1) {
+        team1 = tournamentData.team1;
+      }
+      if (tournamentData && tournamentData.team2) {
+        team2 = tournamentData.team2;
+      }
+
+      // Try multiple places for toss information:
+      // - tournamentData.toss { winner: "team1"/"team2" or team name, decision: "bat"/"bowl" }
+      // - tournamentData.tossWinner and tournamentData.decision  (legacy)
+      // - tournamentData.tossWinner might be a team name instead of "team1"/"team2"
+      let rawWinner = null;
+      let rawDecision = null;
+
+      if (tournamentData) {
+        if (tournamentData.toss && typeof tournamentData.toss === "object") {
+          rawWinner = tournamentData.toss.winner || tournamentData.tossWinner || null;
+          rawDecision = tournamentData.toss.decision || tournamentData.tossDecision || null;
+        }
+        // legacy/alternate keys
+        rawWinner = rawWinner || tournamentData.tossWinner || tournamentData.winner || null;
+        rawDecision = rawDecision || tournamentData.decision || tournamentData.tossDecision || null;
+      }
+
+      const decision = normalizeDecision(rawDecision);
+
+      // Determine winner type: could be "team1"/"team2" or actual team name
+      let winnerKey = null; // "team1" or "team2" or null
+      if (rawWinner === "team1" || rawWinner === "team2") {
+        winnerKey = rawWinner;
+      } else if (typeof rawWinner === "string") {
+        const rw = rawWinner.trim();
+        if (rw === (team1.name || "").trim()) winnerKey = "team1";
+        else if (rw === (team2.name || "").trim()) winnerKey = "team2";
+      }
+
+      // Decide batting & bowling teams
+      if (winnerKey && decision) {
+        if (decision === "bat") {
+          battingTeam = (winnerKey === "team1") ? team1 : team2;
+          bowlingTeam = (winnerKey === "team1") ? team2 : team1;
+        } else { // decision === "bowl"
+          battingTeam = (winnerKey === "team1") ? team2 : team1;
+          bowlingTeam = (winnerKey === "team1") ? team1 : team2;
+        }
+      } else {
+        // fallback: if toss info missing or ambiguous, use team1 as batting by default
+        battingTeam = team1;
+        bowlingTeam = team2;
+      }
+
+      // update UI elements & dropdowns
+      document.getElementById("teamName").innerText = battingTeam.name || "Team";
+      populateDropdown("strikerSelect", battingTeam.players || []);
+      populateDropdown("nonStrikerSelect", battingTeam.players || []);
+      populateDropdown("bowlerSelect", bowlingTeam.players || []);
       updateDisplay();
     }
 
     function populateDropdown(id, players) {
       const dropdown = document.getElementById(id);
       dropdown.innerHTML = "<option value=''>Select</option>";
-      players.forEach(p => {
-        if (p.trim()) {
+      (players || []).forEach(p => {
+        if (typeof p === "string" && p.trim()) {
           const option = document.createElement("option");
-          option.value = p;
-          option.text  = p;
+          option.value = p.trim();
+          option.text  = p.trim();
           dropdown.add(option);
         }
       });
@@ -169,8 +228,8 @@
     function updateDisplay() {
       document.getElementById("teamScore").innerText =
         `Score: ${score}/${wickets} (${overs}.${balls} overs)`;
-      const totalOvers = overs + balls / 6;
-      const nrr = totalOvers > 0 ? (score / totalOvers).toFixed(2) : "0.00";
+      let totalOvers = overs + balls / 6;
+      let nrr = totalOvers > 0 ? (score / totalOvers).toFixed(2) : "0.00";
       document.getElementById("netRunRate").innerText = `NRR: ${nrr}`;
       document.getElementById("currentBatting").innerText =
         `Currently batting: ${battingTeam ? battingTeam.name : "None"}`;
@@ -178,6 +237,8 @@
         `Striker: ${striker} | Non-Striker: ${nonStriker}`;
       document.getElementById("currentBowler").innerText =
         `Bowler: ${bowler}`;
+
+      // Send update to Google Sheets (best-effort)
       saveToSheets();
     }
 
@@ -201,7 +262,7 @@
     function applyRuns() {
       const runs = parseInt(document.getElementById("runsSelect").value);
       if (isNaN(runs)) return;
-      lastAction = { type: "runs", runs };
+      lastAction = { type: "runs", runs: runs };
       addRuns(runs);
     }
 
@@ -220,9 +281,8 @@
     function applyExtras() {
       const val = document.getElementById("extrasSelect").value;
       if (!val) return;
-      const type = val.slice(0, 2),
-            runs = parseInt(val.slice(2));
-      lastAction = { type: "extra", subtype: type, runs };
+      const type = val.slice(0,2), runs = parseInt(val.slice(2));
+      lastAction = { type: "extra", subtype: type, runs: runs };
       addExtra(type, runs);
     }
 
@@ -311,6 +371,7 @@
       alert("Match reset!");
     }
 
+    // initial load
     loadTeams();
   </script>
 </body>
