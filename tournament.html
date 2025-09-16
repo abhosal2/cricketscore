@@ -7,7 +7,8 @@
   <style>
     body {
       font-family: "Copperplate Gothic Light", "Copperplate", Arial, sans-serif;
-      background: url('https://www.deviantart.com/asat103/art/Peacemaker-904835382') no-repeat center center fixed;
+      background: linear-gradient(135deg, #0d1b4c, #4b0f0f);
+      background-attachment: fixed;
       background-size: cover;
       color: #ffffff;
       text-align: center;
@@ -20,12 +21,12 @@
       text-shadow: 2px 2px 6px rgba(0,0,0,0.7);
     }
     .section {
-      background: rgba(30, 30, 30, 0.7); /* frosted glass effect */
+      background: rgba(30, 30, 30, 0.7); /* frosted glass */
       backdrop-filter: blur(8px);
       border-radius: 8px;
       padding: 20px;
       margin: 20px auto;
-      max-width: 500px;
+      max-width: 600px;
       box-shadow: 0 0 15px rgba(131,132,212,0.5);
     }
     label {
@@ -33,25 +34,33 @@
       margin: 10px 0 5px;
       font-weight: bold;
     }
-    input[type="text"], textarea, select {
-      width: 100%;
+    input[type="text"], select {
+      width: 95%;
       padding: 8px;
-      margin-bottom: 15px;
+      margin: 5px auto;
       background: rgba(42,42,42,0.9);
       border: 1px solid #444;
       color: #fff;
       border-radius: 4px;
       font-family: "Copperplate Gothic Light", Arial, sans-serif;
     }
+    .players-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 10px 0;
+    }
     .btn {
       background: rgba(30,30,30,0.8);
       border: 1px solid #444;
-      padding: 10px 20px;
+      padding: 12px 24px;
       color: #fff;
       cursor: pointer;
-      border-radius: 4px;
-      margin: 10px 5px;
+      border-radius: 6px;
+      margin: 20px auto;
+      display: block;
       font-family: "Copperplate Gothic Light", Arial, sans-serif;
+      font-size: 16px;
     }
     .btn:hover { background: rgba(51,51,51,0.9); }
   </style>
@@ -63,19 +72,38 @@
     <h2>Team 1</h2>
     <label for="team1Name">Team Name</label>
     <input type="text" id="team1Name" placeholder="Enter Team 1 Name">
-    <label for="team1Players">Players (comma separated)</label>
-    <textarea id="team1Players" rows="3" placeholder="Player1, Player2, ..."></textarea>
+
+    <label>Players (Max 8)</label>
+    <div class="players-grid" id="team1Players">
+      <input type="text" placeholder="Player 1">
+      <input type="text" placeholder="Player 2">
+      <input type="text" placeholder="Player 3">
+      <input type="text" placeholder="Player 4">
+      <input type="text" placeholder="Player 5">
+      <input type="text" placeholder="Player 6">
+      <input type="text" placeholder="Player 7">
+      <input type="text" placeholder="Player 8">
+    </div>
   </div>
 
   <div class="section">
     <h2>Team 2</h2>
     <label for="team2Name">Team Name</label>
     <input type="text" id="team2Name" placeholder="Enter Team 2 Name">
-    <label for="team2Players">Players (comma separated)</label>
-    <textarea id="team2Players" rows="3" placeholder="Player1, Player2, ..."></textarea>
+
+    <label>Players (Max 8)</label>
+    <div class="players-grid" id="team2Players">
+      <input type="text" placeholder="Player 1">
+      <input type="text" placeholder="Player 2">
+      <input type="text" placeholder="Player 3">
+      <input type="text" placeholder="Player 4">
+      <input type="text" placeholder="Player 5">
+      <input type="text" placeholder="Player 6">
+      <input type="text" placeholder="Player 7">
+      <input type="text" placeholder="Player 8">
+    </div>
   </div>
 
-  <!-- Toss Section placed just before Save buttons -->
   <div class="section">
     <h2>Toss</h2>
     <label for="tossWinner">Toss Winner</label>
@@ -93,77 +121,70 @@
     </select>
   </div>
 
-  <!-- Save buttons -->
-  <button class="btn" onclick="saveLocalTournament()">Save Locally</button>
-  <button class="btn" onclick="saveTournamentToSupabase()">Save to Supabase</button>
+  <!-- Single save button -->
+  <button class="btn" onclick="saveTournament()">Save Tournament</button>
 
-  <!-- supabase client (v2) via CDN -->
+  <!-- supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <script>
     const SUPABASE_URL = "https://ukziqsqffdavuctzyngn.supabase.co";
     const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVremlxc3FmZmRhdnVjdHp5bmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwMzA4MDQsImV4cCI6MjA3MzYwNjgwNH0.d8c2lnVKhoVLHHI3pKBLr9kaE1zB-ll5CjvFE8bZxQs";
     const { createClient } = supabase;
     const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-    function saveLocalTournament() {
+    async function saveTournament() {
+      const team1Players = [...document.querySelectorAll("#team1Players input")].map(el => el.value.trim()).filter(Boolean);
+      const team2Players = [...document.querySelectorAll("#team2Players input")].map(el => el.value.trim()).filter(Boolean);
+
       const t = {
-        team1: {
-          name: document.getElementById('team1Name').value.trim(),
-          players: document.getElementById('team1Players').value.split(',').map(p => p.trim())
-        },
-        team2: {
-          name: document.getElementById('team2Name').value.trim(),
-          players: document.getElementById('team2Players').value.split(',').map(p => p.trim())
-        },
+        team1: { name: document.getElementById('team1Name').value.trim(), players: team1Players },
+        team2: { name: document.getElementById('team2Name').value.trim(), players: team2Players },
         toss: {
           winner: document.getElementById('tossWinner').value,
           decision: document.getElementById('tossDecision').value
         }
       };
+
+      // Save locally
       localStorage.setItem('tournamentData', JSON.stringify(t));
-      alert('Tournament data saved locally!');
-    }
 
-    async function saveTournamentToSupabase() {
-      const t = JSON.parse(localStorage.getItem("tournamentData") || "{}");
-      if (!t || !t.team1 || !t.team2) {
-        alert("No local tournamentData. Save locally first.");
-        return;
+      // Save to Supabase
+      try {
+        const { data: team1Data, error: e1 } = await supabaseClient
+          .from('teams').insert({ name: t.team1.name }).select().single();
+        if (e1) throw e1;
+
+        if (t.team1.players.length) {
+          await supabaseClient.from('players')
+            .insert(t.team1.players.map(p => ({ team_id: team1Data.id, name: p })));
+        }
+
+        const { data: team2Data, error: e2 } = await supabaseClient
+          .from('teams').insert({ name: t.team2.name }).select().single();
+        if (e2) throw e2;
+
+        if (t.team2.players.length) {
+          await supabaseClient.from('players')
+            .insert(t.team2.players.map(p => ({ team_id: team2Data.id, name: p })));
+        }
+
+        const { data: matchRow, error: mErr } = await supabaseClient
+          .from('matches')
+          .insert({
+            team1_id: team1Data.id,
+            team2_id: team2Data.id,
+            toss_winner: t.toss.winner,
+            toss_decision: t.toss.decision
+          }).select().single();
+
+        if (mErr) throw mErr;
+
+        localStorage.setItem('matchId', String(matchRow.id));
+        alert('Tournament saved successfully! (matchId=' + matchRow.id + ')');
+      } catch (err) {
+        console.error('Error saving tournament:', err);
+        alert('Error saving tournament. Check console for details.');
       }
-
-      // insert team1
-      const { data: team1Data, error: e1 } = await supabaseClient
-        .from('teams').insert({ name: t.team1.name }).select().single();
-      if (e1) return console.error('Team1 Error:', e1);
-
-      const team1Players = t.team1.players.filter(p => p && p.trim())
-        .map(p => ({ team_id: team1Data.id, name: p.trim() }));
-      if (team1Players.length) await supabaseClient.from('players').insert(team1Players);
-
-      // insert team2
-      const { data: team2Data, error: e2 } = await supabaseClient
-        .from('teams').insert({ name: t.team2.name }).select().single();
-      if (e2) return console.error('Team2 Error:', e2);
-
-      const team2Players = t.team2.players.filter(p => p && p.trim())
-        .map(p => ({ team_id: team2Data.id, name: p.trim() }));
-      if (team2Players.length) await supabaseClient.from('players').insert(team2Players);
-
-      // insert match with toss
-      const { data: matchRow, error: mErr } = await supabaseClient
-        .from('matches')
-        .insert({
-          team1_id: team1Data.id,
-          team2_id: team2Data.id,
-          toss_winner: t.toss.winner,
-          toss_decision: t.toss.decision
-        }).select().single();
-
-      if (mErr) return console.error('Match Error:', mErr);
-
-      localStorage.setItem('matchId', String(matchRow.id));
-      alert('Saved to Supabase (matchId=' + matchRow.id + ')');
     }
   </script>
 </body>
