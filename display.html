@@ -64,21 +64,70 @@
     📢 <span id="commentaryText">Simple commentary / announcements will appear here.</span>
   </div>
 
+  <!-- Supabase client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
-    function loadDisplayData() {
-      const data = JSON.parse(localStorage.getItem("scoreDisplay") || "{}");
+    // Supabase project settings
+    const SUPABASE_URL = "https://ukziqsqffdavuctzyngn.supabase.co";
+    const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVremlxc3FmZmRhdnVjdHp5bmduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwMzA4MDQsImV4cCI6MjA3MzYwNjgwNH0.d8c2lnVKhoVLHHI3pKBLr9kaE1zB-ll5CjvFE8bZxQs"; // replace with your anon key
+    const { createClient } = supabase;
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-      document.getElementById("teamName").innerText = data.team || "Team";
-      document.getElementById("teamScore").innerText = data.score || "Score: 0/0 (0.0 overs)";
-      document.getElementById("netRunRate").innerText = data.nrr || "NRR: 0.00";
-      document.getElementById("targetMessage").innerText = data.targetMessage || "";
-      document.getElementById("currentBatting").innerText = data.batting || "Currently batting: None";
-      document.getElementById("currentPlayers").innerText = data.players || "Striker: None | Non-Striker: None";
-      document.getElementById("currentBowler").innerText = data.bowler || "Bowler: None";
-      document.getElementById("commentaryText").innerText = data.commentary || "Simple commentary / announcements will appear here.";
+    // matchId is stored in localStorage by tournament.html
+    const matchId = localStorage.getItem("matchId");
+
+    async function loadDisplayData() {
+      if (!matchId) {
+        console.error("No matchId found in localStorage.");
+        return;
+      }
+
+      // fetch latest match row
+      const { data: matchData, error: matchError } = await supabaseClient
+        .from("matches")
+        .select(`
+          id,
+          team1:team1_id(name),
+          team2:team2_id(name),
+          toss_winner,
+          toss_decision,
+          score,
+          wickets,
+          overs,
+          striker,
+          non_striker,
+          bowler,
+          commentary
+        `)
+        .eq("id", matchId)
+        .single();
+
+      if (matchError) {
+        console.error("Error loading match:", matchError);
+        return;
+      }
+
+      // update DOM with match data
+      document.getElementById("teamName").innerText = matchData.team1?.name || "Team";
+      document.getElementById("teamScore").innerText =
+        `Score: ${matchData.score || 0}/${matchData.wickets || 0} (${matchData.overs || "0.0"} overs)`;
+
+      let totalOvers = parseFloat(matchData.overs || 0);
+      let nrr = totalOvers > 0 ? (matchData.score / totalOvers).toFixed(2) : "0.00";
+      document.getElementById("netRunRate").innerText = `NRR: ${nrr}`;
+
+      document.getElementById("currentBatting").innerText =
+        `Currently batting: ${matchData.team1?.name || "None"}`;
+      document.getElementById("currentPlayers").innerText =
+        `Striker: ${matchData.striker || "None"} | Non-Striker: ${matchData.non_striker || "None"}`;
+      document.getElementById("currentBowler").innerText =
+        `Bowler: ${matchData.bowler || "None"}`;
+
+      document.getElementById("commentaryText").innerText =
+        matchData.commentary || "Simple commentary / announcements will appear here.";
     }
 
-    // Refresh scoreboard every 3 seconds
+    // refresh every 3 seconds
     setInterval(loadDisplayData, 3000);
     loadDisplayData();
   </script>
