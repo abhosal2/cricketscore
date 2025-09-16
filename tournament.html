@@ -31,7 +31,7 @@
       font-size: 14px;
       text-align: left;
     }
-    input {
+    input[type="text"] {
       padding: 8px;
       margin: 6px 0;
       border: none;
@@ -57,6 +57,22 @@
     }
     button:hover {
       background: #6a6bc0;
+    }
+    #tossSection {
+      display: none;
+      margin-top: 30px;
+      background: #1a3570;
+      padding: 20px;
+      border-radius: 12px;
+      width: 80%;
+      max-width: 500px;
+      margin-left: auto;
+      margin-right: auto;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+    }
+    .radio-group {
+      text-align: left;
+      margin-top: 10px;
     }
   </style>
 </head>
@@ -108,10 +124,34 @@
   </div>
 
   <button onclick="saveTournament()">Save Tournament</button>
-  <button onclick="goToScore()">Go to Score Page</button>
+
+  <!-- Toss & Bat/Bowl Selection -->
+  <div id="tossSection">
+    <h2>Toss Result</h2>
+    <div class="radio-group">
+      <strong>Who won the toss?</strong><br>
+      <label><input type="radio" name="tossWinner" value="team1"> <span id="team1Label"></span></label><br>
+      <label><input type="radio" name="tossWinner" value="team2"> <span id="team2Label"></span></label>
+    </div>
+    <div class="radio-group" style="margin-top:15px;">
+      <strong>Decision:</strong><br>
+      <label><input type="radio" name="tossDecision" value="bat"> Bat</label><br>
+      <label><input type="radio" name="tossDecision" value="bowl"> Bowl</label>
+    </div>
+    <button onclick="goToScore()">Go to Score Page</button>
+  </div>
 
   <script>
     function saveTournament() {
+      // basic validation first
+      let inputs = document.querySelectorAll("input[type='text']");
+      for (let input of inputs) {
+        if (input.value.trim() === "") {
+          alert("⚠️ Please fill all fields before saving!");
+          return;
+        }
+      }
+
       let tournamentData = {
         team1: {
           name: document.getElementById('team1Name').value,
@@ -145,16 +185,29 @@
 
       localStorage.setItem("tournamentData", JSON.stringify(tournamentData));
       alert("Tournament Data Saved Successfully!");
+
+      // show toss section and populate team labels
+      document.getElementById("team1Label").textContent = tournamentData.team1.name;
+      document.getElementById("team2Label").textContent = tournamentData.team2.name;
+      document.getElementById("tossSection").style.display = "block";
     }
 
     function goToScore() {
-      let inputs = document.querySelectorAll("input");
-      for (let input of inputs) {
-        if (input.value.trim() === "") {
-          alert("⚠️ Please fill all fields before proceeding!");
-          return;
-        }
+      // Check toss winner and decision
+      let winner = document.querySelector('input[name="tossWinner"]:checked');
+      let decision = document.querySelector('input[name="tossDecision"]:checked');
+      if (!winner || !decision) {
+        alert("⚠️ Please select who won the toss and their decision!");
+        return;
       }
+
+      let tournamentData = JSON.parse(localStorage.getItem("tournamentData") || "{}");
+      tournamentData.toss = {
+        winner: winner.value,
+        decision: decision.value
+      };
+      localStorage.setItem("tournamentData", JSON.stringify(tournamentData));
+
       window.location.href = "score.html";
     }
   </script>
