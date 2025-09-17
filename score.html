@@ -1,3 +1,8 @@
+// Protect scoring page
+const scorerSession = localStorage.getItem("scorerSession");
+if (!scorerSession) {
+  window.location.href = "login.html"; // not logged in → redirect
+}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -222,3 +227,4 @@
   </script>
 </body>
 </html>
+
