@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Login - Scorer Access</title>
+  <style>
+    body {
+      font-family: "Copperplate Gothic Light", Arial, sans-serif;
+      background: #121212;
+      color: white;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    .login-box {
+      background: #1e1e2f;
+      padding: 30px;
+      border-radius: 12px;
+      width: 300px;
+      box-shadow: 0 0 12px #8384D4;
+      text-align: center;
+    }
+    h2 { color: #8384D4; margin-bottom: 20px; }
+    input {
+      width: 90%;
+      padding: 10px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 6px;
+      background: #222;
+      color: white;
+    }
+    button {
+      padding: 10px 20px;
+      background: #8384D4;
+      border: none;
+      border-radius: 6px;
+      color: white;
+      font-size: 16px;
+      cursor: pointer;
+      margin-top: 10px;
+    }
+    button:hover { background: #6c6db8; }
+    .error { color: #ff4d4d; margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <div class="login-box">
+    <h2>Scorer Login</h2>
+    <input type="email" id="email" placeholder="Email">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <p id="error" class="error"></p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    const SUPABASE_URL = "https://ukziqsqffdavuctzyngn.supabase.co";
+    const SUPABASE_ANON_KEY = "YOUR_SUPABASE_KEY";
+    const { createClient } = supabase;
+    const supabaseClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+    async function login() {
+      const email = document.getElementById("email").value;
+      const password = document.getElementById("password").value;
+
+      const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
+
+      if (error) {
+        document.getElementById("error").textContent = "❌ " + error.message;
+      } else {
+        localStorage.setItem("scorerSession", JSON.stringify(data.session));
+        window.location.href = "score.html"; // go to scorer page
+      }
+    }
+  </script>
+</body>
+</html>
