@@ -3,15 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <title>Scorer Panel</title>
+
+  <!-- 🔒 Protect scoring page -->
+  <script>
+    const scorerSession = localStorage.getItem("scorerSession");
+    if (!scorerSession) {
+      window.location.href = "login.html"; // not logged in → redirect
+    }
+  </script>
+
   <style>
-    <script>
-    // Protect scoring page
-const scorerSession = localStorage.getItem("scorerSession");
-if (!scorerSession) {
-  window.location.href = "login.html"; // not logged in → redirect
-}
-    </script>
-  </head>
     body {
       font-family: "Copperplate Gothic Light", Arial, sans-serif;
       background: #121212;
@@ -19,6 +20,7 @@ if (!scorerSession) {
       text-align: center;
       padding: 20px;
     }
+
     .scoreboard, .controls, .selectors, .extras {
       background: #1e1e2f;
       padding: 20px;
@@ -28,7 +30,12 @@ if (!scorerSession) {
       max-width: 950px;
       box-shadow: 0 0 10px #8384D4;
     }
-    h1, h2, h3 { color: #8384D4; margin: 8px 0; }
+
+    h1, h2, h3 {
+      color: #8384D4;
+      margin: 8px 0;
+    }
+
     select, button, input[type="number"], input[type="text"] {
       margin: 6px;
       padding: 10px 14px;
@@ -37,12 +44,39 @@ if (!scorerSession) {
       border: none;
       outline: none;
     }
-    select, input[type="number"], input[type="text"] { background: #222; color: #fff; }
-    button { background: #8384D4; color: white; cursor: pointer; }
-    button:hover { background: #6c6db8; }
-    button:disabled { background: #444; cursor: not-allowed; }
-    .warn { border: 2px solid #ff5252; border-radius: 10px; }
-    .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center; }
+
+    select, input[type="number"], input[type="text"] {
+      background: #222;
+      color: #fff;
+    }
+
+    button {
+      background: #8384D4;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #6c6db8;
+    }
+
+    button:disabled {
+      background: #444;
+      cursor: not-allowed;
+    }
+
+    .warn {
+      border: 2px solid #ff5252;
+      border-radius: 10px;
+    }
+
+    .row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      justify-content: center;
+      align-items: center;
+    }
   </style>
 </head>
 <body>
@@ -162,34 +196,45 @@ if (!scorerSession) {
       const { data } = await supabaseClient.from("batting_stats")
         .select("id").eq("match_id", matchId).eq("player_name", player).maybeSingle();
       if (!data) {
-        await supabaseClient.from("batting_stats").insert({ match_id: matchId, player_name: player, runs: 0, balls: 0, fours: 0, sixes: 0, is_out: false });
+        await supabaseClient.from("batting_stats").insert({
+          match_id: matchId,
+          player_name: player,
+          runs: 0, balls: 0, fours: 0, sixes: 0, is_out: false
+        });
       }
     }
+
     async function ensureBowlingRow(player) {
       if (!player || player === "None") return;
       const { data } = await supabaseClient.from("bowling_stats")
         .select("id").eq("match_id", matchId).eq("bowler_name", player).maybeSingle();
       if (!data) {
-        await supabaseClient.from("bowling_stats").insert({ match_id: matchId, bowler_name: player, overs: 0, runs_conceded: 0, wickets: 0 });
+        await supabaseClient.from("bowling_stats").insert({
+          match_id: matchId,
+          bowler_name: player,
+          overs: 0, runs_conceded: 0, wickets: 0
+        });
       }
     }
-
-    // (initScores, confirmPlayers, etc... remain SAME as before) ...
 
     async function addWicket() {
       if (waitingNewBatsman || waitingNewBowler) { alert("Confirm selection first!"); return; }
       await ensureBowlingRow(bowler);
 
       pushSnapshot("wicket", { bowler, striker });
-
       wickets++;
       commentary = "Wicket falls!";
       const overEnded = advanceBallAndMaybeOver();
 
-      await supabaseClient.rpc("increment_bowling_wickets", { match_id_in: matchId, bowler_in: bowler });
-      await supabaseClient.from("batting_stats").update({ is_out: true }).eq("match_id", matchId).eq("player_name", striker);
+      await supabaseClient.rpc("increment_bowling_wickets", {
+        match_id_in: matchId,
+        bowler_in: bowler
+      });
+      await supabaseClient.from("batting_stats")
+        .update({ is_out: true })
+        .eq("match_id", matchId)
+        .eq("player_name", striker);
 
-      // ⬇️ Insert into dismissals
       const dismissalType = document.getElementById("dismissalType").value;
       const fielderName = document.getElementById("fielderName")?.value || null;
       await supabaseClient.from("dismissals").insert({
@@ -202,7 +247,10 @@ if (!scorerSession) {
       });
 
       if (overEnded) {
-        await supabaseClient.rpc("increment_bowling_overs", { match_id_in: matchId, bowler_in: bowler });
+        await supabaseClient.rpc("increment_bowling_overs", {
+          match_id_in: matchId,
+          bowler_in: bowler
+        });
         requireNewBowler();
       }
 
@@ -213,8 +261,10 @@ if (!scorerSession) {
     async function undo() {
       const snap = history.pop(); if (!snap) return;
       if (snap.type === "wicket") {
-        await supabaseClient.rpc("decrement_bowling_wickets", { match_id_in: matchId, bowler_in: snap.data.bowler });
-        // ⬇️ Delete last dismissal
+        await supabaseClient.rpc("decrement_bowling_wickets", {
+          match_id_in: matchId,
+          bowler_in: snap.data.bowler
+        });
         await supabaseClient.from("dismissals")
           .delete()
           .eq("match_id", matchId)
@@ -230,5 +280,3 @@ if (!scorerSession) {
   </script>
 </body>
 </html>
-
-
