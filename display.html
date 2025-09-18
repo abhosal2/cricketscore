@@ -43,10 +43,10 @@
   <h1>🏏 Live Match Scoreboard</h1>
 
   <div class="scoreboard">
-    <div class="line"><strong>Team:</strong> <span id="teamName">Loading...</span></div>
+    <div class="line"><strong>Batting Team:</strong> <span id="battingTeam">Loading...</span></div>
+    <div class="line"><strong>Bowling Team:</strong> <span id="bowlingTeam">Loading...</span></div>
     <div class="line"><strong>Score:</strong> <span id="score">0/0 (0.0 overs)</span></div>
     <div class="line"><strong>NRR:</strong> <span id="nrr">0.00</span></div>
-    <div class="line"><strong>Currently batting:</strong> <span id="batting">None</span></div>
     <div class="line"><strong>Striker:</strong> <span id="striker">None</span> | 
                  <strong>Non-Striker:</strong> <span id="nonStriker">None</span></div>
     <div class="line"><strong>Bowler:</strong> <span id="bowler">None</span></div>
@@ -63,18 +63,56 @@
 
     const matchId = localStorage.getItem("matchId");
 
+    let battingTeam = "";
+    let bowlingTeam = "";
+
     function updateUI(data) {
-      document.getElementById("teamName").textContent = "Match " + matchId;
+      document.getElementById("battingTeam").textContent = battingTeam;
+      document.getElementById("bowlingTeam").textContent = bowlingTeam;
       document.getElementById("score").textContent =
         `${data.runs}/${data.wickets} (${data.overs} overs)`;
       document.getElementById("nrr").textContent = (data.overs > 0) 
         ? (data.runs / data.overs).toFixed(2) 
         : "0.00";
-      document.getElementById("batting").textContent = data.striker || "None";
       document.getElementById("striker").textContent = data.striker || "None";
       document.getElementById("nonStriker").textContent = data.non_striker || "None";
       document.getElementById("bowler").textContent = data.bowler || "None";
       document.getElementById("commentary").textContent = data.commentary || "📢 Waiting for updates...";
+    }
+
+    async function loadMatchDetails() {
+      if (!matchId) return;
+
+      const { data: match, error: matchErr } = await supabaseClient
+        .from("matches")
+        .select(`
+          id,
+          team1:teams!matches_team1_id_fkey(name),
+          team2:teams!matches_team2_id_fkey(name),
+          toss_winner,
+          toss_decision
+        `)
+        .eq("id", matchId)
+        .single();
+
+      if (matchErr) {
+        console.error("Error loading match:", matchErr);
+        return;
+      }
+
+      if (
+        (match.toss_winner === "team1" && match.toss_decision === "bat") ||
+        (match.toss_winner === "team2" && match.toss_decision === "bowl")
+      ) {
+        battingTeam = match.team1.name;
+        bowlingTeam = match.team2.name;
+      } else {
+        battingTeam = match.team2.name;
+        bowlingTeam = match.team1.name;
+      }
+
+      // Load initial score after knowing teams
+      loadInitial();
     }
 
     async function loadInitial() {
@@ -88,7 +126,6 @@
       if (data) updateUI(data);
     }
 
-    // Subscribe to realtime updates for this match
     function subscribeToUpdates() {
       supabaseClient
         .channel("score_updates_" + matchId)
@@ -102,7 +139,7 @@
         .subscribe();
     }
 
-    loadInitial();
+    loadMatchDetails();
     subscribeToUpdates();
   </script>
 </body>
