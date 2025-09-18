@@ -217,61 +217,31 @@
       }
     }
 
-    // 🔹 Load match + team info when page opens
-    async function loadMatchDetails() {
-      if (!matchId) return;
+    // ✅ Added back confirmPlayers()
+    async function confirmPlayers() {
+      striker = document.getElementById("strikerSelect").value;
+      non_striker = document.getElementById("nonStrikerSelect").value;
+      bowler = document.getElementById("bowlerSelect").value;
 
-      const { data: match, error: matchErr } = await supabaseClient
-        .from("matches")
-        .select(`
-          id,
-          team1:teams!matches_team1_id_fkey(name, captain, players:players(name)),
-          team2:teams!matches_team2_id_fkey(name, captain, players:players(name)),
-          toss_winner,
-          toss_decision
-        `)
-        .eq("id", matchId)
-        .single();
-
-      if (matchErr) {
-        console.error("Error loading match:", matchErr);
+      if (!striker || !non_striker || !bowler) {
+        alert("Please select striker, non-striker, and bowler before starting!");
         return;
       }
 
-      // Decide batting/bowling
-      if (
-        (match.toss_winner === "team1" && match.toss_decision === "bat") ||
-        (match.toss_winner === "team2" && match.toss_decision === "bowl")
-      ) {
-        battingTeam = match.team1.name;
-        bowlingTeam = match.team2.name;
-        battingPlayers = match.team1.players.map(p => p.name);
-        bowlingPlayers = match.team2.players.map(p => p.name);
-      } else {
-        battingTeam = match.team2.name;
-        bowlingTeam = match.team1.name;
-        battingPlayers = match.team2.players.map(p => p.name);
-        bowlingPlayers = match.team1.players.map(p => p.name);
-      }
+      await ensureBattingRow(striker);
+      await ensureBattingRow(non_striker);
+      await ensureBowlingRow(bowler);
 
-      document.getElementById("battingTeam").innerText = "Batting Team: " + battingTeam;
-      document.getElementById("bowlingTeam").innerText = "Bowling Team: " + bowlingTeam;
+      // Lock selections
+      document.getElementById("selectorsBox").classList.remove("warn");
+      document.querySelectorAll("#selectorsBox select, #selectorsBox button")
+        .forEach(el => el.disabled = true);
 
-      // Populate dropdowns
-      const strikerSel = document.getElementById("strikerSelect");
-      const nonStrikerSel = document.getElementById("nonStrikerSelect");
-      const bowlerSel = document.getElementById("bowlerSelect");
-      strikerSel.innerHTML = "<option value=''>-- Select --</option>";
-      nonStrikerSel.innerHTML = "<option value=''>-- Select --</option>";
-      bowlerSel.innerHTML = "<option value=''>-- Select --</option>";
+      // Enable scoring buttons
+      document.querySelectorAll(".controls button, .extras button")
+        .forEach(el => el.disabled = false);
 
-      battingPlayers.forEach(p => {
-        strikerSel.innerHTML += `<option value="${p}">${p}</option>`;
-        nonStrikerSel.innerHTML += `<option value="${p}">${p}</option>`;
-      });
-      bowlingPlayers.forEach(p => {
-        bowlerSel.innerHTML += `<option value="${p}">${p}</option>`;
-      });
+      updateDisplay();
     }
 
     async function addWicket() {
@@ -334,9 +304,6 @@
       restoreSnapshot(snap);
       updateDisplay();
     }
-
-    // Run on load
-    loadMatchDetails();
   </script>
 </body>
 </html>
