@@ -217,6 +217,63 @@
       }
     }
 
+    // 🔹 Load match + team info when page opens
+    async function loadMatchDetails() {
+      if (!matchId) return;
+
+      const { data: match, error: matchErr } = await supabaseClient
+        .from("matches")
+        .select(`
+          id,
+          team1:teams!matches_team1_id_fkey(name, captain, players:players(name)),
+          team2:teams!matches_team2_id_fkey(name, captain, players:players(name)),
+          toss_winner,
+          toss_decision
+        `)
+        .eq("id", matchId)
+        .single();
+
+      if (matchErr) {
+        console.error("Error loading match:", matchErr);
+        return;
+      }
+
+      // Decide batting/bowling
+      if (
+        (match.toss_winner === "team1" && match.toss_decision === "bat") ||
+        (match.toss_winner === "team2" && match.toss_decision === "bowl")
+      ) {
+        battingTeam = match.team1.name;
+        bowlingTeam = match.team2.name;
+        battingPlayers = match.team1.players.map(p => p.name);
+        bowlingPlayers = match.team2.players.map(p => p.name);
+      } else {
+        battingTeam = match.team2.name;
+        bowlingTeam = match.team1.name;
+        battingPlayers = match.team2.players.map(p => p.name);
+        bowlingPlayers = match.team1.players.map(p => p.name);
+      }
+
+      document.getElementById("battingTeam").innerText = "Batting Team: " + battingTeam;
+      document.getElementById("bowlingTeam").innerText = "Bowling Team: " + bowlingTeam;
+
+      // Populate dropdowns
+      const strikerSel = document.getElementById("strikerSelect");
+      const nonStrikerSel = document.getElementById("nonStrikerSelect");
+      const bowlerSel = document.getElementById("bowlerSelect");
+      strikerSel.innerHTML = "<option value=''>-- Select --</option>";
+      nonStrikerSel.innerHTML = "<option value=''>-- Select --</option>";
+      bowlerSel.innerHTML = "<option value=''>-- Select --</option>";
+
+      battingPlayers.forEach(p => {
+        strikerSel.innerHTML += `<option value="${p}">${p}</option>`;
+        nonStrikerSel.innerHTML += `<option value="${p}">${p}</option>`;
+      });
+      bowlingPlayers.forEach(p => {
+        bowlerSel.innerHTML += `<option value="${p}">${p}</option>`;
+      });
+    }
+
     async function addWicket() {
       if (waitingNewBatsman || waitingNewBowler) { alert("Confirm selection first!"); return; }
       await ensureBowlingRow(bowler);
@@ -277,6 +334,9 @@
       restoreSnapshot(snap);
       updateDisplay();
     }
+
+    // Run on load
+    loadMatchDetails();
   </script>
 </body>
 </html>
