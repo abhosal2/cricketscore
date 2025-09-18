@@ -63,12 +63,9 @@
 
     const matchId = localStorage.getItem("matchId");
 
-    let battingTeam = "";
-    let bowlingTeam = "";
-
-    function updateUI(data) {
-      document.getElementById("battingTeam").textContent = battingTeam;
-      document.getElementById("bowlingTeam").textContent = bowlingTeam;
+    function updateUI(data, teamNames) {
+      document.getElementById("battingTeam").textContent = teamNames?.batting || "Unknown";
+      document.getElementById("bowlingTeam").textContent = teamNames?.bowling || "Unknown";
       document.getElementById("score").textContent =
         `${data.runs}/${data.wickets} (${data.overs} overs)`;
       document.getElementById("nrr").textContent = (data.overs > 0) 
@@ -80,66 +77,84 @@
       document.getElementById("commentary").textContent = data.commentary || "📢 Waiting for updates...";
     }
 
-    async function loadMatchDetails() {
-      if (!matchId) return;
-
-      const { data: match, error: matchErr } = await supabaseClient
-        .from("matches")
-        .select(`
-          id,
-          team1:teams!matches_team1_id_fkey(name),
-          team2:teams!matches_team2_id_fkey(name),
-          toss_winner,
-          toss_decision
-        `)
-        .eq("id", matchId)
-        .single();
-
-      if (matchErr) {
-        console.error("Error loading match:", matchErr);
-        return;
-      }
-
-      if (
-        (match.toss_winner === "team1" && match.toss_decision === "bat") ||
-        (match.toss_winner === "team2" && match.toss_decision === "bowl")
-      ) {
-        battingTeam = match.team1.name;
-        bowlingTeam = match.team2.name;
-      } else {
-        battingTeam = match.team2.name;
-        bowlingTeam = match.team1.name;
-      }
-
-      // Load initial score after knowing teams
-      loadInitial();
-    }
-
     async function loadInitial() {
       if (!matchId) return;
-      const { data, error } = await supabaseClient
+
+      // Fetch scores
+      const { data: scoreData } = await supabaseClient
         .from("scores")
         .select("*")
         .eq("match_id", matchId)
         .single();
 
-      if (data) updateUI(data);
+      // Fetch teams
+      const { data: matchData } = await supabaseClient
+        .from("matches")
+        .select("team1_id, team2_id, toss_winner, toss_decision")
+        .eq("id", matchId)
+        .single();
+
+      let teamNames = { batting: "Team 1", bowling: "Team 2" };
+      if (matchData) {
+        const { data: team1 } = await supabaseClient.from("teams").select("name").eq("id", matchData.team1_id).single();
+        const { data: team2 } = await supabaseClient.from("teams").select("name").eq("id", matchData.team2_id).single();
+
+        if (team1 && team2) {
+          if (matchData.toss_winner === "team1" && matchData.toss_decision === "bat") {
+            teamNames = { batting: team1.name, bowling: team2.name };
+          } else if (matchData.toss_winner === "team1" && matchData.toss_decision === "bowl") {
+            teamNames = { batting: team2.name, bowling: team1.name };
+          } else if (matchData.toss_winner === "team2" && matchData.toss_decision === "bat") {
+            teamNames = { batting: team2.name, bowling: team1.name };
+          } else if (matchData.toss_winner === "team2" && matchData.toss_decision === "bowl") {
+            teamNames = { batting: team1.name, bowling: team2.name };
+          }
+        }
+      }
+
+      if (scoreData) updateUI(scoreData, teamNames);
     }
 
+    // Subscribe to realtime updates
     function subscribeToUpdates() {
       supabaseClient
         .channel("score_updates_" + matchId)
         .on(
           "postgres_changes",
           { event: "UPDATE", schema: "public", table: "scores", filter: `match_id=eq.${matchId}` },
-          (payload) => {
-            updateUI(payload.new);
+          async (payload) => {
+            // fetch match to decide batting/bowling teams again
+            const { data: matchData } = await supabaseClient
+              .from("matches")
+              .select("team1_id, team2_id, toss_winner, toss_decision")
+              .eq("id", matchId)
+              .single();
+
+            let teamNames = { batting: "Team 1", bowling: "Team 2" };
+            if (matchData) {
+              const { data: team1 } = await supabaseClient.from("teams").select("name").eq("id", matchData.team1_id).single();
+              const { data: team2 } = await supabaseClient.from("teams").select("name").eq("id", matchData.team2_id).single();
+
+              if (team1 && team2) {
+                if (matchData.toss_winner === "team1" && matchData.toss_decision === "bat") {
+                  teamNames = { batting: team1.name, bowling: team2.name };
+                } else if (matchData.toss_winner === "team1" && matchData.toss_decision === "bowl") {
+                  teamNames = { batting: team2.name, bowling: team1.name };
+                } else if (matchData.toss_winner === "team2" && matchData.toss_decision === "bat") {
+                  teamNames = { batting: team2.name, bowling: team1.name };
+                } else if (matchData.toss_winner === "team2" && matchData.toss_decision === "bowl") {
+                  teamNames = { batting: team1.name, bowling: team2.name };
+                }
+              }
+            }
+
+            updateUI(payload.new, teamNames);
           }
         )
         .subscribe();
     }
 
-    loadMatchDetails();
+    loadInitial();
     subscribeToUpdates();
   </script>
 </body>
