@@ -13,6 +13,9 @@
       text-align: center;
       min-height: 100vh;
       overflow-x: hidden;
+      background: radial-gradient(circle at top, #0d1b3d, #000000 80%);
+      background-size: cover;
+      background-position: center;
     }
 
     h1 { 
@@ -77,7 +80,7 @@
 
     .btn:hover { background: rgba(51,51,51,0.9); }
 
-    /* Cinematic glowing wall background */
+    /* Cinematic cricket night background */
     .wall {
       position: fixed;
       top: 0;
@@ -92,29 +95,29 @@
       z-index: 0;
       padding: 0;
       margin: 0;
-      background: #d3d3d3; /* light grey background wall */
-      filter: blur(4px) brightness(0.6); /* blur + dim */
+      background: radial-gradient(circle at center, rgba(0, 60, 120, 0.4), rgba(0, 0, 0, 0.95));
+      filter: blur(3px) brightness(0.7);
       overflow: hidden;
     }
 
     .panel {
-      background: #000; /* cubes remain black */
+      background: #000;
       border: 2px solid rgba(255, 255, 255, 0.05);
       animation: glowWave 3s infinite;
     }
 
     @keyframes glowWave {
       0%, 100% {
-        box-shadow: 0 0 10px #000, inset 0 0 6px rgba(255,255,255,0.05);
+        box-shadow: 0 0 10px #1e90ff, inset 0 0 6px rgba(255,255,255,0.05);
       }
       50% {
-        box-shadow: 0 0 25px #000, inset 0 0 15px rgba(255,255,255,0.1);
+        box-shadow: 0 0 25px #00ffcc, inset 0 0 15px rgba(255,255,255,0.1);
       }
     }
   </style>
 </head>
 <body>
-  <!-- Glowing cinematic background -->
+  <!-- Glowing cricket stadium background -->
   <div class="wall" id="wall"></div>
 
   <h1>Tournament Data</h1>
