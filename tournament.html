@@ -246,6 +246,18 @@
 
         if (mErr) throw mErr;
 
+        // ✅ Create an initial scores row for this match
+        await supabaseClient.from("scores").insert({
+          match_id: matchRow.id,
+          runs: 0,
+          wickets: 0,
+          overs: 0,
+          striker: "None",
+          non_striker: "None",
+          bowler: "None",
+          commentary: ""
+        });
+
         localStorage.setItem('matchId', String(matchRow.id));
         alert('Tournament saved successfully! (matchId=' + matchRow.id + ')');
       } catch (err) {
