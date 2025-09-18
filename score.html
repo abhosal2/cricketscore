@@ -77,6 +77,26 @@
       justify-content: center;
       align-items: center;
     }
+
+    /* Simple modal for selecting new bowler after an over */
+    .modal-backdrop {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.6);
+      align-items: center; justify-content: center;
+      z-index: 9999;
+    }
+    .modal {
+      background: #1e1e2f;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 0 12px #8384D4;
+      width: 90%;
+      max-width: 420px;
+      text-align: left;
+    }
+    .modal h3 { margin-top: 0; color: #fff; }
+    .modal .actions { margin-top: 12px; display: flex; gap: 10px; justify-content: flex-end; }
   </style>
 </head>
 <body>
@@ -166,6 +186,18 @@
     </div>
   </div>
 
+  <!-- Over-end Bowler Modal -->
+  <div class="modal-backdrop" id="bowlerModal">
+    <div class="modal">
+      <h3>Select new bowler for the next over</h3>
+      <select id="newBowlerSelect" style="width:100%"><option value="">-- Select Bowler --</option></select>
+      <div class="actions">
+        <button onclick="closeBowlerModal()">Cancel</button>
+        <button onclick="confirmBowlerModal()">Confirm</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Supabase client -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script>
@@ -176,29 +208,17 @@
 
     // ------- STATE -------
     let matchId = localStorage.getItem("matchId");
-    let runs = 0, wickets = 0, overs = 0, balls = 0; // overs + balls (0..5)
+    let runs = 0, wickets = 0, overs = 0, balls = 0; // balls = 0..5
     let striker = "None", non_striker = "None", bowler = "None", commentary = "";
     let battingTeam = "", bowlingTeam = "";
     let battingPlayers = [], bowlingPlayers = [];
     let team1Captain = "", team2Captain = "";
     let waitingNewBatsman = false, waitingNewBowler = false;
 
-    const history = []; // for Undo
+    // Undo history entries carry both before-state snapshot and the operation delta
+    const history = [];
 
-    // ------- HELPERS -------
-    function pushSnapshot(type, data={}) {
-      history.push({ type, data, runs, wickets, overs, balls, striker, non_striker, bowler, commentary });
-      document.getElementById("btnUndo").disabled = false;
-    }
-    function restoreSnapshot(snap) {
-      runs = snap.runs; wickets = snap.wickets; overs = snap.overs; balls = snap.balls;
-      striker = snap.striker; non_striker = snap.non_striker; bowler = snap.bowler;
-      commentary = snap.commentary || "";
-    }
-    function oversDecimal() {
-      // store overs as x.y where y=balls (0..5)
-      return parseFloat((overs + balls / 10).toFixed(1));
-    }
+    // ------- UI HELPERS -------
     function updateDisplay() {
       document.getElementById("score").textContent = `Score: ${runs}/${wickets} (${overs}.${balls} overs)`;
       document.getElementById("striker").textContent = `Striker: ${striker}`;
@@ -207,156 +227,156 @@
       document.getElementById("battingTeam").textContent = `Batting Team: ${battingTeam}`;
       document.getElementById("bowlingTeam").textContent = `Bowling Team: ${bowlingTeam}`;
       const o = overs + balls/6;
-      document.getElementById("nrr").textContent = o > 0 ? (runs / o).toFixed(2) : "0.00";
+      document.getElementById("nrr").textContent = o > 0 ? (runs/o).toFixed(2) : "0.00";
     }
-    async function saveScore() {
-      // Ensure a row exists and upsert latest values
-      await supabaseClient.from("scores").upsert({
-        match_id: matchId,
-        runs, wickets,
-        overs: oversDecimal(),       // store as decimal (x.y with balls)
-        striker, non_striker, bowler,
-        commentary
-      }, { onConflict: "match_id" });
+    function oversDecimal() {
+      // store as x.y where y is balls (0..5) to fit decimal(4,1)
+      return Number((overs + balls/10).toFixed(1));
     }
+    function enableScoring(enabled) {
+      document.querySelectorAll(".controls button, .extras button").forEach(b=>{
+        if (b.textContent.includes("Go to Display Page")) return;
+        b.disabled = !enabled;
+      });
+    }
+    function pushHistory(entry) {
+      history.push(entry);
+      document.getElementById("btnUndo").disabled = false;
+    }
+
+    // ------- DB HELPERS (bat/bowl rows) -------
     async function ensureBattingRow(player) {
       if (!player || player === "None") return;
       const { data } = await supabaseClient.from("batting_stats")
         .select("id").eq("match_id", matchId).eq("player_name", player).maybeSingle();
       if (!data) {
         await supabaseClient.from("batting_stats").insert({
-          match_id: matchId,
-          player_name: player,
+          match_id: matchId, player_name: player,
           runs: 0, balls: 0, fours: 0, sixes: 0, is_out: false
         });
       }
     }
-    async function ensureBowlingRow(player) {
-      if (!player || player === "None") return;
+    async function ensureBowlingRow(p) {
+      if (!p || p === "None") return;
       const { data } = await supabaseClient.from("bowling_stats")
-        .select("id").eq("match_id", matchId).eq("bowler_name", player).maybeSingle();
+        .select("id").eq("match_id", matchId).eq("bowler_name", p).maybeSingle();
       if (!data) {
         await supabaseClient.from("bowling_stats").insert({
-          match_id: matchId,
-          bowler_name: player,
+          match_id: matchId, bowler_name: p,
           overs: 0, runs_conceded: 0, wickets: 0
         });
       }
     }
-    async function incBatting(player, r, isBall=true) {
+    async function adjBatting(player, druns=0, dballs=0, dfours=0, dsixes=0) {
       if (!player || player==="None") return;
-      const incs = {};
-      if (isBall) incs.balls = supabase.sql`balls + 1`;
-      if (r>0) incs.runs = supabase.sql`runs + ${r}`;
-      if (r===4) incs.fours = supabase.sql`fours + 1`;
-      if (r===6) incs.sixes = supabase.sql`sixes + 1`;
-      if (Object.keys(incs).length===0) return;
+      const { data: row } = await supabaseClient.from("batting_stats")
+        .select("runs,balls,fours,sixes").eq("match_id", matchId).eq("player_name", player).single();
+      if (!row) return;
+      await supabaseClient.from("batting_stats").update({
+        runs: Math.max(0, (row.runs||0)+druns),
+        balls: Math.max(0, (row.balls||0)+dballs),
+        fours: Math.max(0, (row.fours||0)+dfours),
+        sixes: Math.max(0, (row.sixes||0)+dsixes),
+      }).eq("match_id", matchId).eq("player_name", player);
+    }
+    async function setBatsmanOut(player, isOut) {
       await supabaseClient.from("batting_stats")
-        .update(incs).eq("match_id", matchId).eq("player_name", player);
+        .update({ is_out: !!isOut })
+        .eq("match_id", matchId).eq("player_name", player);
     }
-    async function incBowlingRuns(player, r) {
-      if (!player || player==="None" || r<=0) return;
-      await supabaseClient.from("bowling_stats")
-        .update({ runs_conceded: supabase.sql`runs_conceded + ${r}` })
-        .eq("match_id", matchId).eq("bowler_name", player);
-    }
-    async function incBowlingWicket(player) {
-      if (!player || player==="None") return;
-      await supabaseClient.from("bowling_stats")
-        .update({ wickets: supabase.sql`wickets + 1` })
-        .eq("match_id", matchId).eq("bowler_name", player);
-    }
-    async function incBowlerOver(player) {
-      if (!player || player==="None") return;
-      await supabaseClient.from("bowling_stats")
-        .update({ overs: supabase.sql`overs + 1` })
-        .eq("match_id", matchId).eq("bowler_name", player);
+    async function adjBowling(p, dRuns=0, dWkts=0, dOvers=0) {
+      if (!p || p==="None") return;
+      const { data: row } = await supabaseClient.from("bowling_stats")
+        .select("runs_conceded,wickets,overs").eq("match_id", matchId).eq("bowler_name", p).maybeSingle();
+      const rc = Math.max(0, (row?.runs_conceded || 0) + dRuns);
+      const wk = Math.max(0, (row?.wickets || 0) + dWkts);
+      const ov = Math.max(0, (row?.overs || 0) + dOvers);
+      await supabaseClient.from("bowling_stats").update({
+        runs_conceded: rc, wickets: wk, overs: ov
+      }).eq("match_id", matchId).eq("bowler_name", p);
     }
 
-    // ------- LOAD TEAMS / PLAYERS -------
+    // ------- SCORES SAVE -------
+    async function saveScore() {
+      await supabaseClient.from("scores").upsert({
+        match_id: matchId,
+        runs, wickets, overs: oversDecimal(),
+        striker, non_striker, bowler,
+        commentary
+      }, { onConflict: "match_id" });
+    }
+
+    // ------- LOAD TEAMS/PLAYERS -------
     async function loadTeams() {
       if (!matchId) return;
 
-      // Load existing score row if any
-      const { data: existingScore } = await supabaseClient
-        .from("scores").select("*").eq("match_id", matchId).maybeSingle();
-      if (existingScore) {
-        runs = existingScore.runs || 0;
-        wickets = existingScore.wickets || 0;
-        // overs as decimal x.y -> split
-        if (typeof existingScore.overs === "number") {
-          const ov = existingScore.overs;
-          overs = Math.floor(ov);
-          balls = Math.round((ov - overs) * 10); // because we saved x.y with y=balls
+      // Load existing score row (resume state if present)
+      const { data: s } = await supabaseClient.from("scores").select("*").eq("match_id", matchId).maybeSingle();
+      if (s) {
+        runs = s.runs || 0;
+        wickets = s.wickets || 0;
+        if (typeof s.overs === "number") {
+          overs = Math.trunc(s.overs);
+          balls = Math.round((s.overs - overs) * 10); // y digit is balls
         }
-        striker = existingScore.striker || "None";
-        non_striker = existingScore.non_striker || "None";
-        bowler = existingScore.bowler || "None";
-        commentary = existingScore.commentary || "";
+        striker = s.striker || "None";
+        non_striker = s.non_striker || "None";
+        bowler = s.bowler || "None";
+        commentary = s.commentary || "";
       }
 
       const { data: matchData, error: mErr } = await supabaseClient
         .from("matches")
         .select("team1_id, team2_id, toss_winner, toss_decision")
-        .eq("id", matchId)
-        .single();
+        .eq("id", matchId).single();
       if (mErr || !matchData) { console.error("Error loading match:", mErr); return; }
 
       const { data: team1 } = await supabaseClient.from("teams").select("id, name, captain").eq("id", matchData.team1_id).single();
       const { data: team2 } = await supabaseClient.from("teams").select("id, name, captain").eq("id", matchData.team2_id).single();
-      if (!team1 || !team2) return;
-      team1Captain = team1.captain || "";
-      team2Captain = team2.captain || "";
 
-      const team1Players = (await supabaseClient.from("players").select("name").eq("team_id", team1.id)).data?.map(p=>p.name) || [];
-      const team2Players = (await supabaseClient.from("players").select("name").eq("team_id", team2.id)).data?.map(p=>p.name) || [];
+      const t1Players = (await supabaseClient.from("players").select("name").eq("team_id", team1.id)).data?.map(p=>p.name) || [];
+      const t2Players = (await supabaseClient.from("players").select("name").eq("team_id", team2.id)).data?.map(p=>p.name) || [];
 
-      // Decide batting/bowling order from toss
-      if (matchData.toss_winner === "team1" && matchData.toss_decision === "bat") {
-        battingTeam = team1.name; bowlingTeam = team2.name;
-        battingPlayers = team1Players; bowlingPlayers = team2Players;
-      } else if (matchData.toss_winner === "team1" && matchData.toss_decision === "bowl") {
-        battingTeam = team2.name; bowlingTeam = team1.name;
-        battingPlayers = team2Players; bowlingPlayers = team1Players;
-      } else if (matchData.toss_winner === "team2" && matchData.toss_decision === "bat") {
-        battingTeam = team2.name; bowlingTeam = team1.name;
-        battingPlayers = team2Players; bowlingPlayers = team1Players;
+      // Decide batting order from toss
+      const tw = matchData.toss_winner, td = matchData.toss_decision;
+      if (tw==="team1" && td==="bat" || tw==="team2" && td==="bowl") {
+        battingTeam = team1.name; bowlingTeam = team2.name; battingPlayers = t1Players; bowlingPlayers = t2Players;
       } else {
-        battingTeam = team1.name; bowlingTeam = team2.name;
-        battingPlayers = team1Players; bowlingPlayers = team2Players;
+        battingTeam = team2.name; bowlingTeam = team1.name; battingPlayers = t2Players; bowlingPlayers = t1Players;
       }
+      team1Captain = team1.captain || ""; team2Captain = team2.captain || "";
 
-      // Populate dropdowns (append (C) visually)
+      // Fill selects with (C) for captains
       const strikerSel = document.getElementById("strikerSelect");
-      const nonStrikerSel = document.getElementById("nonStrikerSelect");
-      const bowlerSel = document.getElementById("bowlerSelect");
-      strikerSel.innerHTML = "<option value=''>-- Select --</option>";
-      nonStrikerSel.innerHTML = "<option value=''>-- Select --</option>";
-      bowlerSel.innerHTML = "<option value=''>-- Select --</option>";
-
-      const battingCaptain = (battingTeam === team1.name) ? team1Captain : team2Captain;
+      const nonSel = document.getElementById("nonStrikerSelect");
+      const bowlSel = document.getElementById("bowlerSelect");
       const bowlingCaptain = (bowlingTeam === team1.name) ? team1Captain : team2Captain;
+      const battingCaptain = (battingTeam === team1.name) ? team1Captain : team2Captain;
 
-      battingPlayers.forEach(p => {
-        const label = (p === battingCaptain && p) ? `${p} (C)` : p;
+      strikerSel.innerHTML = "<option value=''>-- Select --</option>";
+      nonSel.innerHTML = "<option value=''>-- Select --</option>";
+      bowlSel.innerHTML = "<option value=''>-- Select --</option>";
+
+      battingPlayers.forEach(p=>{
+        const label = (p===battingCaptain && p) ? `${p} (C)` : p;
         strikerSel.innerHTML += `<option value="${p}">${label}</option>`;
-        nonStrikerSel.innerHTML += `<option value="${p}">${label}</option>`;
+        nonSel.innerHTML += `<option value="${p}">${label}</option>`;
       });
-      bowlingPlayers.forEach(p => {
-        const label = (p === bowlingCaptain && p) ? `${p} (C)` : p;
-        bowlerSel.innerHTML += `<option value="${p}">${label}</option>`;
+      bowlingPlayers.forEach(p=>{
+        const label = (p===bowlingCaptain && p) ? `${p} (C)` : p;
+        bowlSel.innerHTML += `<option value="${p}">${label}</option>`;
       });
 
       document.getElementById("battingTeam").textContent = `Batting Team: ${battingTeam}`;
       document.getElementById("bowlingTeam").textContent = `Bowling Team: ${bowlingTeam}`;
 
-      // If we had names already saved in scores row, reflect them in selectors and UI
+      // Reflect existing names if any
       if (striker !== "None") strikerSel.value = striker;
-      if (non_striker !== "None") nonStrikerSel.value = non_striker;
-      if (bowler !== "None") bowlerSel.value = bowler;
+      if (non_striker !== "None") nonSel.value = non_striker;
+      if (bowler !== "None") bowlSel.value = bowler;
 
       updateDisplay();
-      // If no score row yet, create one
+      // Ensure row exists in scores
       await saveScore();
     }
 
@@ -371,7 +391,7 @@
         return;
       }
       if (striker === non_striker) {
-        alert("Striker and Non-Striker must be different players.");
+        alert("Striker and Non-Striker must be different.");
         return;
       }
 
@@ -379,13 +399,10 @@
       await ensureBattingRow(non_striker);
       await ensureBowlingRow(bowler);
 
-      // Lock selections (initial)
-      document.getElementById("selectorsBox").classList.remove("warn");
-      document.querySelectorAll("#selectorsBox select").forEach(el => el.disabled = true);
+      // Lock initial selections; enable scoring
+      document.querySelectorAll("#selectorsBox select").forEach(el=>el.disabled = true);
       document.getElementById("btnConfirmInitial").disabled = true;
-
-      // Enable scoring buttons
-      document.querySelectorAll(".controls button, .extras button").forEach(el => el.disabled = false);
+      enableScoring(true);
 
       await saveScore();
       updateDisplay();
@@ -393,17 +410,14 @@
 
     function requireNewBatsman() {
       waitingNewBatsman = true;
-      // Unlock just striker select for new batsman
       document.getElementById("strikerSelect").disabled = false;
       document.getElementById("btnConfirmNewBat").style.display = "inline-block";
-      // prevent scoring while waiting
-      document.querySelectorAll(".controls button, .extras button").forEach(el => el.disabled = true);
-      document.getElementById("btnConfirmNewBat").disabled = false;
+      enableScoring(false);
     }
     async function setNewBatsman() {
       const newBat = document.getElementById("strikerSelect").value;
       if (!newBat || newBat === non_striker) {
-        alert("Select a valid new batsman (not the non-striker).");
+        alert("Select a valid new batsman.");
         return;
       }
       striker = newBat;
@@ -412,73 +426,91 @@
       waitingNewBatsman = false;
       document.getElementById("strikerSelect").disabled = true;
       document.getElementById("btnConfirmNewBat").style.display = "none";
-      // re-enable scoring
-      document.querySelectorAll(".controls button, .extras button").forEach(el => el.disabled = false);
+      enableScoring(true);
 
       commentary = `${striker} comes to the crease.`;
       await saveScore();
       updateDisplay();
     }
 
+    function openBowlerModal() {
+      const modal = document.getElementById("bowlerModal");
+      const sel = document.getElementById("newBowlerSelect");
+      sel.innerHTML = "<option value=''>-- Select Bowler --</option>";
+      bowlingPlayers.forEach(p => sel.innerHTML += `<option value="${p}">${p}</option>`);
+      modal.style.display = "flex";
+    }
+    function closeBowlerModal() {
+      document.getElementById("bowlerModal").style.display = "none";
+    }
+    async function confirmBowlerModal() {
+      const val = document.getElementById("newBowlerSelect").value;
+      if (!val) { alert("Pick a bowler"); return; }
+      bowler = val;
+      await ensureBowlingRow(bowler);
+      commentary = `New over by ${bowler}.`;
+      await saveScore();
+      updateDisplay();
+      closeBowlerModal();
+      waitingNewBowler = false;
+      enableScoring(true);
+    }
     function requireNewBowler() {
       waitingNewBowler = true;
-      document.getElementById("bowlerSelect").disabled = false;
-      document.getElementById("btnConfirmNewBowler").style.display = "inline-block";
-      document.querySelectorAll(".controls button, .extras button").forEach(el => el.disabled = true);
-      document.getElementById("btnConfirmNewBowler").disabled = false;
+      enableScoring(false);
+      openBowlerModal();
     }
     async function setNewBowler() {
-      const newBow = document.getElementById("bowlerSelect").value;
-      if (!newBow) { alert("Select a bowler."); return; }
-      bowler = newBow;
+      // Fallback button (kept for parity), uses current #bowlerSelect
+      const b = document.getElementById("bowlerSelect").value;
+      if (!b) { alert("Select a bowler."); return; }
+      bowler = b;
       await ensureBowlingRow(bowler);
-
       waitingNewBowler = false;
-      document.getElementById("bowlerSelect").disabled = true;
       document.getElementById("btnConfirmNewBowler").style.display = "none";
-      document.querySelectorAll(".controls button, .extras button").forEach(el => el.disabled = false);
-
+      enableScoring(true);
       commentary = `New over by ${bowler}.`;
       await saveScore();
       updateDisplay();
     }
 
-    // ------- SCORING LOGIC -------
+    // ------- BALL/OVER FLOW -------
     function advanceBallAndMaybeOver() {
       balls++;
       if (balls >= 6) {
-        balls = 0;
-        overs++;
-        // strike rotates at end of over
-        [striker, non_striker] = [non_striker, striker];
-        return true; // over ended
+        balls = 0; overs++;
+        [striker, non_striker] = [non_striker, striker]; // strike rotates at over end
+        return true;
       }
       return false;
     }
 
+    // ------- SCORING -------
     async function addRun(r) {
       if (waitingNewBatsman || waitingNewBowler) return;
-      pushSnapshot("run", { runs: r, striker });
+
+      // Snapshot before change for undo
+      const snap = { type: "run", r, prev: { runs, wickets, overs, balls, striker, non_striker, bowler }};
 
       runs += r;
-      // This is a legal ball
       const overEnded = advanceBallAndMaybeOver();
 
-      // rotate strike on odd runs
-      if (!overEnded && r % 2 === 1) {
-        [striker, non_striker] = [non_striker, striker];
-      }
+      // odd runs rotate strike unless over ended already did
+      if (!overEnded && (r % 2 === 1)) [striker, non_striker] = [non_striker, striker];
 
       // stats
       await ensureBattingRow(striker);
-      await incBatting(striker, r, true);
+      await adjBatting(striker, r, 1, r===4?1:0, r===6?1:0);
       await ensureBowlingRow(bowler);
-      await incBowlingRuns(bowler, r);
-      if (overEnded) await incBowlerOver(bowler);
+      await adjBowling(bowler, r, 0, overEnded?1:0);
 
       commentary = `${striker} scores ${r} run${r>1?"s":""}.`;
       await saveScore();
       updateDisplay();
+
+      // record undo info (including if over ended to roll back bowler overs)
+      snap.overEnded = overEnded;
+      pushHistory(snap);
 
       if (overEnded) requireNewBowler();
     }
@@ -489,124 +521,144 @@
       const x = parseInt(document.getElementById("extrasRuns").value || "1", 10);
       if (x <= 0) return;
 
-      pushSnapshot("extra", { type, runs: x });
+      const snap = { type: "extra", subtype: type, x, prev: { runs, wickets, overs, balls, striker, non_striker, bowler } };
 
       if (type === "wide" || type === "no_ball") {
-        // does NOT count as a ball
-        runs += x;
+        runs += x; // not a ball
         await ensureBowlingRow(bowler);
-        await incBowlingRuns(bowler, x);
+        await adjBowling(bowler, x, 0, 0);
         commentary = `${type.replace("_"," ")} +${x}`;
-        // no strike change unless odd BYEs on a legal ball (not here)
+        await saveScore(); updateDisplay();
+        pushHistory(snap);
       } else if (type === "leg_bye") {
-        // counts as a ball, but not to batsman's runs
         runs += x;
         const overEnded = advanceBallAndMaybeOver();
-        // strike changes on odd leg byes if over not ended
-        if (!overEnded && (x % 2 === 1)) {
-          [striker, non_striker] = [non_striker, striker];
-        }
+        if (!overEnded && (x % 2 === 1)) [striker, non_striker] = [non_striker, striker];
         await ensureBowlingRow(bowler);
-        await incBowlingRuns(bowler, x);
+        await adjBowling(bowler, x, 0, overEnded?1:0);
         commentary = `Leg bye +${x}`;
-        if (overEnded) {
-          await incBowlerOver(bowler);
-          requireNewBowler();
-        }
+        await saveScore(); updateDisplay();
+        snap.overEnded = overEnded;
+        pushHistory(snap);
+        if (overEnded) requireNewBowler();
       }
-
-      await saveScore();
-      updateDisplay();
     }
 
     async function addWicket() {
       if (waitingNewBatsman || waitingNewBowler) { alert("Confirm selection first!"); return; }
-      pushSnapshot("wicket", { bowler, striker });
+      const snap = { type: "wicket", prev: { runs, wickets, overs, balls, striker, non_striker, bowler } };
 
       wickets++;
       const overEnded = advanceBallAndMaybeOver();
 
-      // mark striker out
       await ensureBowlingRow(bowler);
-      await incBowlingWicket(bowler);
-      await supabaseClient.from("batting_stats")
-        .update({ is_out: true })
-        .eq("match_id", matchId)
-        .eq("player_name", striker);
+      await adjBowling(bowler, 0, 1, overEnded?1:0);
+      await setBatsmanOut(striker, true);
 
-      // record dismissal
+      // Insert dismissal row
       const dismissalType = document.getElementById("dismissalType").value;
       const fielderName = document.getElementById("fielderName")?.value || null;
-      await supabaseClient.from("dismissals").insert({
-        match_id: matchId,
-        batsman: striker,
-        bowler: bowler,
-        fielder: fielderName,
-        dismissal_type: dismissalType
-      });
+      const { data: dism } = await supabaseClient.from("dismissals").insert({
+        match_id: matchId, batsman: striker, bowler: bowler,
+        fielder: fielderName, dismissal_type: dismissalType
+      }).select().single();
+      snap.dismissal_id = dism?.id || null;
 
       commentary = `WICKET! ${striker} ${dismissalType}${fielderName ? " by " + fielderName : ""}`;
-      await saveScore();
-      updateDisplay();
+      await saveScore(); updateDisplay();
 
-      if (overEnded) {
-        await incBowlerOver(bowler);
-        requireNewBowler();
-      }
+      snap.overEnded = overEnded;
+      pushHistory(snap);
+
+      if (overEnded) requireNewBowler();
       requireNewBatsman();
     }
 
     function swapStrike(manual=false) {
       if (waitingNewBatsman || waitingNewBowler) return;
-      pushSnapshot("swap", {});
+      const snap = { type: "swap", prev: { runs, wickets, overs, balls, striker, non_striker, bowler } };
       [striker, non_striker] = [non_striker, striker];
       commentary = manual ? "Strike rotated manually." : "Strike rotated.";
-      saveScore();
-      updateDisplay();
+      saveScore(); updateDisplay();
+      pushHistory(snap);
     }
 
     async function endInnings() {
-      // flip teams for next innings
-      pushSnapshot("end_innings", {});
-      commentary = "Innings ended.";
+      // Save state, then swap teams, clear players; keep score in DB as is.
+      const snap = { type: "end_innings", prev: { runs, wickets, overs, balls, striker, non_striker, bowler, battingTeam, bowlingTeam, battingPlayers:[...battingPlayers], bowlingPlayers:[...bowlingPlayers] } };
 
-      // swap teams
+      commentary = "Innings ended.";
+      await saveScore(); updateDisplay();
+
+      // Switch innings
       [battingTeam, bowlingTeam] = [bowlingTeam, battingTeam];
       [battingPlayers, bowlingPlayers] = [bowlingPlayers, battingPlayers];
-
-      // reset batter/bowler selections
       striker = "None"; non_striker = "None"; bowler = "None";
 
-      // unlock selectors to choose new players
+      // Unlock selects to choose fresh
       document.getElementById("strikerSelect").disabled = false;
       document.getElementById("nonStrikerSelect").disabled = false;
       document.getElementById("bowlerSelect").disabled = false;
+      document.getElementById("btnConfirmInitial").disabled = false;
+      enableScoring(false);
 
-      document.getElementById("btnConfirmInitial").disabled = false; // reuse to reconfirm
-
-      // disable scoring until reconfirmed
-      document.querySelectorAll(".controls button, .extras button").forEach(el => el.disabled = true);
-
-      await saveScore();
-      updateDisplay();
+      await saveScore(); updateDisplay();
+      pushHistory(snap);
     }
 
+    // ------- UNDO -------
     async function undo() {
-      const snap = history.pop(); if (!snap) return;
-      restoreSnapshot(snap);
-      await saveScore();
-      updateDisplay();
+      const h = history.pop();
+      if (!h) return;
+
+      // Revert scores state
+      runs = h.prev.runs; wickets = h.prev.wickets; overs = h.prev.overs; balls = h.prev.balls;
+      striker = h.prev.striker; non_striker = h.prev.non_striker; bowler = h.prev.bowler;
+
+      // Reverse DB side-effects for each op type
+      if (h.type === "run") {
+        // reverse batting & bowling increments
+        await adjBatting(h.prev.striker, -h.r, -1, h.r===4?-1:0, h.r===6?-1:0);
+        await adjBowling(h.prev.bowler, -h.r, 0, h.overEnded?-1:0);
+      } else if (h.type === "extra") {
+        if (h.subtype === "wide" || h.subtype === "no_ball") {
+          await adjBowling(h.prev.bowler, -h.x, 0, 0);
+        } else if (h.subtype === "leg_bye") {
+          await adjBowling(h.prev.bowler, -h.x, 0, h.overEnded?-1:0);
+        }
+      } else if (h.type === "wicket") {
+        await adjBowling(h.prev.bowler, 0, -1, h.overEnded?-1:0);
+        await setBatsmanOut(h.prev.striker, false);
+        if (h.dismissal_id) {
+          await supabaseClient.from("dismissals").delete().eq("id", h.dismissal_id);
+        } else {
+          // fallback: delete most recent dismissal for that batsman in this match
+          await supabaseClient.rpc("delete_last_dismissal_for_batsman", { match_in: matchId, batsman_in: h.prev.striker }).catch(()=>{});
+        }
+        // Cancel any pending new-batsman flow
+        waitingNewBatsman = false;
+        document.getElementById("btnConfirmNewBat").style.display = "none";
+        document.getElementById("strikerSelect").disabled = true;
+      } else if (h.type === "swap") {
+        // nothing extra, state restored above
+      } else if (h.type === "end_innings") {
+        battingTeam = h.prev.battingTeam; bowlingTeam = h.prev.bowlingTeam;
+        battingPlayers = h.prev.battingPlayers; bowlingPlayers = h.prev.bowlingPlayers;
+      }
+
+      await saveScore(); updateDisplay();
       if (history.length === 0) document.getElementById("btnUndo").disabled = true;
-      // clear any "waiting" flags/buttons if we undid to a safe state
-      waitingNewBatsman = false; waitingNewBowler = false;
-      document.getElementById("btnConfirmNewBat").style.display = "none";
-      document.getElementById("btnConfirmNewBowler").style.display = "none";
-      document.getElementById("strikerSelect").disabled = true;
-      document.getElementById("bowlerSelect").disabled = true;
+
+      // Close any modals and re-enable scoring
+      closeBowlerModal();
+      waitingNewBowler = false; waitingNewBatsman = false;
+      enableScoring(true);
     }
 
     // ------- START -------
     loadTeams();
+    // Initially disable scoring until players set
+    enableScoring(false);
   </script>
 </body>
 </html>
