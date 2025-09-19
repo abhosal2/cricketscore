@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Live Match Scoreboard</title>
   <style>
     body {
@@ -21,13 +21,18 @@
       background: rgba(30,30,30,0.85);
       border-radius: 10px;
       padding: 20px;
-      max-width: 500px;
+      max-width: 560px;
       margin: 0 auto;
       box-shadow: 0 0 15px rgba(255,255,255,0.2);
     }
     .line {
       margin: 10px 0;
       font-size: 18px;
+    }
+    #score {
+      font-size: 26px; /* ⬆ bigger score font */
+      font-weight: 700;
+      letter-spacing: 0.3px;
     }
     .commentary {
       margin-top: 20px;
@@ -37,6 +42,28 @@
       font-style: italic;
       box-shadow: inset 0 0 8px rgba(255,255,255,0.2);
     }
+    .stats {
+      margin-top: 16px;
+      padding: 12px 14px;
+      background: rgba(40,40,40,0.9);
+      border-radius: 8px;
+      text-align: left;
+    }
+    .stats h3 {
+      margin: 0 0 10px 0;
+      font-size: 18px;
+      text-align: center;
+      color: #eaeaea;
+      text-shadow: 0 0 6px rgba(255,255,255,0.15);
+    }
+    .statline {
+      margin: 6px 0;
+      font-size: 16px;
+    }
+    .name {
+      font-weight: 700;
+      letter-spacing: 0.2px;
+    }
   </style>
 </head>
 <body>
@@ -45,11 +72,23 @@
   <div class="scoreboard">
     <div class="line"><strong>Batting Team:</strong> <span id="battingTeam">Loading...</span></div>
     <div class="line"><strong>Bowling Team:</strong> <span id="bowlingTeam">Loading...</span></div>
+
     <div class="line"><strong>Score:</strong> <span id="score">0/0 (0.0 overs)</span></div>
     <div class="line"><strong>NRR:</strong> <span id="nrr">0.00</span></div>
-    <div class="line"><strong>Striker:</strong> <span id="striker">None</span> | 
-                 <strong>Non-Striker:</strong> <span id="nonStriker">None</span></div>
+
+    <div class="line">
+      <strong>Striker:</strong> <span id="striker">None</span> |
+      <strong>Non-Striker:</strong> <span id="nonStriker">None</span>
+    </div>
     <div class="line"><strong>Bowler:</strong> <span id="bowler">None</span></div>
+
+    <div class="stats">
+      <h3>Current Player & Bowler Stats</h3>
+      <div class="statline"><span class="name">Striker:</span> <span id="strikerStats">–</span></div>
+      <div class="statline"><span class="name">Non-Striker:</span> <span id="nonStrikerStats">–</span></div>
+      <div class="statline"><span class="name">Bowler:</span> <span id="bowlerStats">–</span></div>
+    </div>
+
     <div class="commentary" id="commentary">📢 Commentary will appear here...</div>
   </div>
 
@@ -63,95 +102,201 @@
 
     const matchId = localStorage.getItem("matchId");
 
-    function updateUI(data, teamNames) {
-      document.getElementById("battingTeam").textContent = teamNames?.batting || "Unknown";
-      document.getElementById("bowlingTeam").textContent = teamNames?.bowling || "Unknown";
-      document.getElementById("score").textContent =
-        `${data.runs}/${data.wickets} (${data.overs} overs)`;
-      document.getElementById("nrr").textContent = (data.overs > 0) 
-        ? (data.runs / data.overs).toFixed(2) 
-        : "0.00";
-      document.getElementById("striker").textContent = data.striker || "None";
-      document.getElementById("nonStriker").textContent = data.non_striker || "None";
-      document.getElementById("bowler").textContent = data.bowler || "None";
-      document.getElementById("commentary").textContent = data.commentary || "📢 Waiting for updates...";
+    // Cached match/team context
+    let team1 = null, team2 = null;
+    let team1Players = [], team2Players = [];
+    let lastBattingTeam = null, lastBowlingTeam = null;
+
+    // --- Helpers ---
+    function formatOversForDisplay(oversVal) {
+      // scores.overs is stored like x.y where y is balls (0..5)
+      const num = Number(oversVal || 0);
+      return num.toFixed(1);
+    }
+    function oversToTrueFloat(oversVal) {
+      // Convert cricket "x.y" (y balls 0..5) into true overs in decimals (y/6)
+      const num = Number(oversVal || 0);
+      const whole = Math.trunc(num);
+      const balls = Math.round((num - whole) * 10);
+      return whole + (balls / 6);
+    }
+    function computeNRR(runs, oversCricketFmt) {
+      const trueOvers = oversToTrueFloat(oversCricketFmt);
+      return trueOvers > 0 ? (runs / trueOvers).toFixed(2) : "0.00";
     }
 
-    async function loadInitial() {
-      if (!matchId) return;
+    function byName(list) {
+      return (list || []).map(p => (typeof p === "string" ? p : p?.name)).filter(Boolean);
+    }
 
-      // Fetch scores
-      const { data: scoreData } = await supabaseClient
-        .from("scores")
-        .select("*")
-        .eq("match_id", matchId)
-        .single();
+    function inferTeamNamesFromState(scoreRow) {
+      // 1) If striker or non-striker matches a team's players, use that
+      if (team1 && team2) {
+        const s = scoreRow.striker || "";
+        const ns = scoreRow.non_striker || "";
+        if (team1Players.includes(s) || team1Players.includes(ns)) {
+          return { batting: team1.name, bowling: team2.name };
+        }
+        if (team2Players.includes(s) || team2Players.includes(ns)) {
+          return { batting: team2.name, bowling: team1.name };
+        }
+      }
 
-      // Fetch teams
+      // 2) If we detect a reset to 0/0 (0.0), assume innings swap from last known state
+      const isReset = (Number(scoreRow.runs) === 0 && Number(scoreRow.wickets) === 0 && Number(scoreRow.overs) === 0);
+      if (isReset && lastBattingTeam && lastBowlingTeam) {
+        return { batting: lastBowlingTeam, bowling: lastBattingTeam };
+      }
+
+      // 3) Fallback to toss decision mapping (first-innings assumption)
+      if (team1 && team2 && team1.toss_winner && team1.toss_decision) {
+        const tw = team1.toss_winner; // "team1" | "team2"
+        const td = team1.toss_decision; // "bat" | "bowl"
+        if ((tw === "team1" && td === "bat") || (tw === "team2" && td === "bowl")) {
+          return { batting: team1.name, bowling: team2.name };
+        } else {
+          return { batting: team2.name, bowling: team1.name };
+        }
+      }
+
+      // 4) As a last resort
+      return { batting: team1?.name || "Team 1", bowling: team2?.name || "Team 2" };
+    }
+
+    function renderBasic(scoreRow, teamNames) {
+      document.getElementById("battingTeam").textContent = teamNames.batting || "Unknown";
+      document.getElementById("bowlingTeam").textContent = teamNames.bowling || "Unknown";
+
+      const oversDisp = formatOversForDisplay(scoreRow.overs);
+      document.getElementById("score").textContent = `${scoreRow.runs}/${scoreRow.wickets} (${oversDisp} overs)`;
+      document.getElementById("nrr").textContent = computeNRR(scoreRow.runs, scoreRow.overs);
+
+      document.getElementById("striker").textContent = scoreRow.striker || "None";
+      document.getElementById("nonStriker").textContent = scoreRow.non_striker || "None";
+      document.getElementById("bowler").textContent = scoreRow.bowler || "None";
+      document.getElementById("commentary").textContent = scoreRow.commentary || "📢 Waiting for updates...";
+    }
+
+    async function renderPerPlayerStats(scoreRow) {
+      // Batsmen
+      const sName = scoreRow.striker;
+      const nsName = scoreRow.non_striker;
+
+      if (sName || nsName) {
+        const names = [sName, nsName].filter(Boolean);
+        const { data: batRows } = await supabaseClient
+          .from("batting_stats")
+          .select("player_name,runs,balls")
+          .eq("match_id", matchId)
+          .in("player_name", names);
+
+        const map = {};
+        (batRows || []).forEach(r => { map[r.player_name] = r; });
+
+        const sRow = sName ? map[sName] : null;
+        const nsRow = nsName ? map[nsName] : null;
+
+        document.getElementById("strikerStats").textContent =
+          sName ? `${sName}: ${sRow?.runs ?? 0} (${sRow?.balls ?? 0})` : "–";
+
+        document.getElementById("nonStrikerStats").textContent =
+          nsName ? `${nsName}: ${nsRow?.runs ?? 0} (${nsRow?.balls ?? 0})` : "–";
+      } else {
+        document.getElementById("strikerStats").textContent = "–";
+        document.getElementById("nonStrikerStats").textContent = "–";
+      }
+
+      // Bowler
+      const bName = scoreRow.bowler;
+      if (bName) {
+        const { data: bRow } = await supabaseClient
+          .from("bowling_stats")
+          .select("overs,runs_conceded,wickets")
+          .eq("match_id", matchId)
+          .eq("bowler_name", bName)
+          .maybeSingle();
+
+        const ov = bRow?.overs ?? 0; // completed overs only (as tracked)
+        const rc = bRow?.runs_conceded ?? 0;
+        const wk = bRow?.wickets ?? 0;
+
+        document.getElementById("bowlerStats").textContent =
+          `${bName}: ${ov} ov, ${rc} runs, ${wk} wkts`;
+      } else {
+        document.getElementById("bowlerStats").textContent = "–";
+      }
+    }
+
+    async function loadContext() {
+      // Matches + team names + store toss info on team1 object for fallback
       const { data: matchData } = await supabaseClient
         .from("matches")
         .select("team1_id, team2_id, toss_winner, toss_decision")
         .eq("id", matchId)
         .single();
 
-      let teamNames = { batting: "Team 1", bowling: "Team 2" };
-      if (matchData) {
-        const { data: team1 } = await supabaseClient.from("teams").select("name").eq("id", matchData.team1_id).single();
-        const { data: team2 } = await supabaseClient.from("teams").select("name").eq("id", matchData.team2_id).single();
+      if (!matchData) return;
 
-        if (team1 && team2) {
-          if (matchData.toss_winner === "team1" && matchData.toss_decision === "bat") {
-            teamNames = { batting: team1.name, bowling: team2.name };
-          } else if (matchData.toss_winner === "team1" && matchData.toss_decision === "bowl") {
-            teamNames = { batting: team2.name, bowling: team1.name };
-          } else if (matchData.toss_winner === "team2" && matchData.toss_decision === "bat") {
-            teamNames = { batting: team2.name, bowling: team1.name };
-          } else if (matchData.toss_winner === "team2" && matchData.toss_decision === "bowl") {
-            teamNames = { batting: team1.name, bowling: team2.name };
-          }
-        }
-      }
+      const team1Res = await supabaseClient.from("teams").select("id,name").eq("id", matchData.team1_id).single();
+      const team2Res = await supabaseClient.from("teams").select("id,name").eq("id", matchData.team2_id).single();
 
-      if (scoreData) updateUI(scoreData, teamNames);
+      team1 = { id: team1Res.data?.id, name: team1Res.data?.name, toss_winner: matchData.toss_winner, toss_decision: matchData.toss_decision };
+      team2 = { id: team2Res.data?.id, name: team2Res.data?.name };
+
+      const t1PlayersRes = await supabaseClient.from("players").select("name").eq("team_id", team1.id);
+      const t2PlayersRes = await supabaseClient.from("players").select("name").eq("team_id", team2.id);
+
+      team1Players = byName(t1PlayersRes.data);
+      team2Players = byName(t2PlayersRes.data);
     }
 
-    // Subscribe to realtime updates
+    async function loadInitial() {
+      if (!matchId) return;
+
+      await loadContext();
+
+      const { data: scoreData } = await supabaseClient
+        .from("scores")
+        .select("*")
+        .eq("match_id", matchId)
+        .maybeSingle();
+
+      if (scoreData) {
+        const teams = inferTeamNamesFromState(scoreData);
+        renderBasic(scoreData, teams);
+        lastBattingTeam = teams.batting;
+        lastBowlingTeam = teams.bowling;
+        await renderPerPlayerStats(scoreData);
+      }
+    }
+
     function subscribeToUpdates() {
-      supabaseClient
+      const channel = supabaseClient
         .channel("score_updates_" + matchId)
         .on(
           "postgres_changes",
-          { event: "UPDATE", schema: "public", table: "scores", filter: `match_id=eq.${matchId}` },
+          { event: "*", schema: "public", table: "scores", filter: `match_id=eq.${matchId}` },
           async (payload) => {
-            // fetch match to decide batting/bowling teams again
-            const { data: matchData } = await supabaseClient
-              .from("matches")
-              .select("team1_id, team2_id, toss_winner, toss_decision")
-              .eq("id", matchId)
-              .single();
+            const row = payload.new || payload.old;
+            if (!row) return;
 
-            let teamNames = { batting: "Team 1", bowling: "Team 2" };
-            if (matchData) {
-              const { data: team1 } = await supabaseClient.from("teams").select("name").eq("id", matchData.team1_id).single();
-              const { data: team2 } = await supabaseClient.from("teams").select("name").eq("id", matchData.team2_id).single();
-
-              if (team1 && team2) {
-                if (matchData.toss_winner === "team1" && matchData.toss_decision === "bat") {
-                  teamNames = { batting: team1.name, bowling: team2.name };
-                } else if (matchData.toss_winner === "team1" && matchData.toss_decision === "bowl") {
-                  teamNames = { batting: team2.name, bowling: team1.name };
-                } else if (matchData.toss_winner === "team2" && matchData.toss_decision === "bat") {
-                  teamNames = { batting: team2.name, bowling: team1.name };
-                } else if (matchData.toss_winner === "team2" && matchData.toss_decision === "bowl") {
-                  teamNames = { batting: team1.name, bowling: team2.name };
-                }
-              }
+            // Ensure team/player context present (e.g., on hot reload)
+            if (!team1 || !team2) {
+              await loadContext();
             }
 
-            updateUI(payload.new, teamNames);
+            const teams = inferTeamNamesFromState(row);
+            renderBasic(row, teams);
+
+            // Remember last known sides (so we can infer swap on 0/0 (0.0))
+            lastBattingTeam = teams.batting;
+            lastBowlingTeam = teams.bowling;
+
+            await renderPerPlayerStats(row);
           }
-        )
-        .subscribe();
+        );
+
+      channel.subscribe();
     }
 
     loadInitial();
