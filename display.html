@@ -30,7 +30,7 @@
       font-size: 18px;
     }
     #score {
-      font-size: 26px; /* ⬆ bigger score font */
+      font-size: 26px; /* bigger score font */
       font-weight: 700;
       letter-spacing: 0.3px;
     }
@@ -109,12 +109,10 @@
 
     // --- Helpers ---
     function formatOversForDisplay(oversVal) {
-      // scores.overs is stored like x.y where y is balls (0..5)
       const num = Number(oversVal || 0);
       return num.toFixed(1);
     }
     function oversToTrueFloat(oversVal) {
-      // Convert cricket "x.y" (y balls 0..5) into true overs in decimals (y/6)
       const num = Number(oversVal || 0);
       const whole = Math.trunc(num);
       const balls = Math.round((num - whole) * 10);
@@ -124,16 +122,18 @@
       const trueOvers = oversToTrueFloat(oversCricketFmt);
       return trueOvers > 0 ? (runs / trueOvers).toFixed(2) : "0.00";
     }
-
     function byName(list) {
       return (list || []).map(p => (typeof p === "string" ? p : p?.name)).filter(Boolean);
     }
+    function isResetRow(row) {
+      return Number(row?.runs) === 0 && Number(row?.wickets) === 0 && Number(row?.overs) === 0;
+    }
 
     function inferTeamNamesFromState(scoreRow) {
-      // 1) If striker or non-striker matches a team's players, use that
+      // Prefer actual players on strike to infer batting side
       if (team1 && team2) {
-        const s = scoreRow.striker || "";
-        const ns = scoreRow.non_striker || "";
+        const s = scoreRow?.striker || "";
+        const ns = scoreRow?.non_striker || "";
         if (team1Players.includes(s) || team1Players.includes(ns)) {
           return { batting: team1.name, bowling: team2.name };
         }
@@ -142,13 +142,12 @@
         }
       }
 
-      // 2) If we detect a reset to 0/0 (0.0), assume innings swap from last known state
-      const isReset = (Number(scoreRow.runs) === 0 && Number(scoreRow.wickets) === 0 && Number(scoreRow.overs) === 0);
-      if (isReset && lastBattingTeam && lastBowlingTeam) {
-        return { batting: lastBowlingTeam, bowling: lastBattingTeam };
+      // New innings reset → swap from last known sides
+      if (isResetRow(scoreRow) && lastBattingTeam && lastBowlingTeam) {
+        return { batting: lastBowlingTeam, bowling: lastBattingTeam ? lastBattingTeam /* will be replaced below */ : lastBowlingTeam };
       }
 
-      // 3) Fallback to toss decision mapping (first-innings assumption)
+      // Fallback: initial toss decision (first innings only)
       if (team1 && team2 && team1.toss_winner && team1.toss_decision) {
         const tw = team1.toss_winner; // "team1" | "team2"
         const td = team1.toss_decision; // "bat" | "bowl"
@@ -158,26 +157,48 @@
           return { batting: team2.name, bowling: team1.name };
         }
       }
-
-      // 4) As a last resort
       return { batting: team1?.name || "Team 1", bowling: team2?.name || "Team 2" };
+    }
+
+    // Clean swap utility for the reset branch above
+    function swapSides(names) {
+      return { batting: names.bowling, bowling: names.batting };
     }
 
     function renderBasic(scoreRow, teamNames) {
       document.getElementById("battingTeam").textContent = teamNames.batting || "Unknown";
       document.getElementById("bowlingTeam").textContent = teamNames.bowling || "Unknown";
 
-      const oversDisp = formatOversForDisplay(scoreRow.overs);
-      document.getElementById("score").textContent = `${scoreRow.runs}/${scoreRow.wickets} (${oversDisp} overs)`;
-      document.getElementById("nrr").textContent = computeNRR(scoreRow.runs, scoreRow.overs);
+      if (scoreRow) {
+        const oversDisp = formatOversForDisplay(scoreRow.overs);
+        document.getElementById("score").textContent = `${scoreRow.runs}/${scoreRow.wickets} (${oversDisp} overs)`;
+        document.getElementById("nrr").textContent = computeNRR(scoreRow.runs, scoreRow.overs);
 
-      document.getElementById("striker").textContent = scoreRow.striker || "None";
-      document.getElementById("nonStriker").textContent = scoreRow.non_striker || "None";
-      document.getElementById("bowler").textContent = scoreRow.bowler || "None";
-      document.getElementById("commentary").textContent = scoreRow.commentary || "📢 Waiting for updates...";
+        document.getElementById("striker").textContent = scoreRow.striker || "None";
+        document.getElementById("nonStriker").textContent = scoreRow.non_striker || "None";
+        document.getElementById("bowler").textContent = scoreRow.bowler || "None";
+        document.getElementById("commentary").textContent = scoreRow.commentary || "📢 Waiting for updates...";
+      } else {
+        // Null-safe defaults until the scores row exists
+        document.getElementById("score").textContent = `0/0 (0.0 overs)`;
+        document.getElementById("nrr").textContent = "0.00";
+        document.getElementById("striker").textContent = "None";
+        document.getElementById("nonStriker").textContent = "None";
+        document.getElementById("bowler").textContent = "None";
+        document.getElementById("commentary").textContent = "📢 Waiting for updates...";
+        // Also clear the stat widgets
+        document.getElementById("strikerStats").textContent = "–";
+        document.getElementById("nonStrikerStats").textContent = "–";
+        document.getElementById("bowlerStats").textContent = "–";
+      }
     }
 
     async function renderPerPlayerStats(scoreRow) {
+      if (!scoreRow) {
+        // already cleared by renderBasic
+        return;
+      }
+
       // Batsmen
       const sName = scoreRow.striker;
       const nsName = scoreRow.non_striker;
@@ -206,29 +227,29 @@
         document.getElementById("nonStrikerStats").textContent = "–";
       }
 
-      // Bowler
+      // Bowler (overs + balls)
       const bName = scoreRow.bowler;
       if (bName) {
         const { data: bRow } = await supabaseClient
           .from("bowling_stats")
-          .select("overs,runs_conceded,wickets")
+          .select("overs,balls,runs_conceded,wickets")
           .eq("match_id", matchId)
           .eq("bowler_name", bName)
           .maybeSingle();
 
-        const ov = bRow?.overs ?? 0; // completed overs only (as tracked)
+        const ov = bRow?.overs ?? 0;
+        const bl = bRow?.balls ?? 0;
         const rc = bRow?.runs_conceded ?? 0;
         const wk = bRow?.wickets ?? 0;
 
         document.getElementById("bowlerStats").textContent =
-          `${bName}: ${ov} ov, ${rc} runs, ${wk} wkts`;
+          `${bName}: ${ov}.${bl} ov, ${rc} runs, ${wk} wkts`;
       } else {
         document.getElementById("bowlerStats").textContent = "–";
       }
     }
 
     async function loadContext() {
-      // Matches + team names + store toss info on team1 object for fallback
       const { data: matchData } = await supabaseClient
         .from("matches")
         .select("team1_id, team2_id, toss_winner, toss_decision")
@@ -251,52 +272,77 @@
     }
 
     async function loadInitial() {
-      if (!matchId) return;
+      if (!matchId) {
+        document.getElementById("commentary").textContent = "⚠️ No match selected.";
+        return;
+      }
 
       await loadContext();
 
+      // Be null-safe: row may not exist yet
       const { data: scoreData } = await supabaseClient
         .from("scores")
         .select("*")
         .eq("match_id", matchId)
         .maybeSingle();
 
+      const inferred = inferTeamNamesFromState(scoreData);
+      // If we detected a reset without last sides, inferred may be ambiguous; keep it anyway
+      // Ensure proper swap if it was detected as reset based solely on last known state
+      const teams = isResetRow(scoreData) && lastBattingTeam && lastBowlingTeam
+        ? swapSides({ batting: lastBattingTeam, bowling: lastBowlingTeam })
+        : inferred;
+
+      renderBasic(scoreData, teams);
+      lastBattingTeam = teams.batting;
+      lastBowlingTeam = teams.bowling;
+
+      // Only attempt per-player stats if we have a score row
       if (scoreData) {
-        const teams = inferTeamNamesFromState(scoreData);
-        renderBasic(scoreData, teams);
-        lastBattingTeam = teams.batting;
-        lastBowlingTeam = teams.bowling;
         await renderPerPlayerStats(scoreData);
       }
     }
 
     function subscribeToUpdates() {
-      const channel = supabaseClient
+      supabaseClient
         .channel("score_updates_" + matchId)
         .on(
           "postgres_changes",
-          { event: "*", schema: "public", table: "scores", filter: `match_id=eq.${matchId}` },
+          { event: "INSERT", schema: "public", table: "scores", filter: `match_id=eq.${matchId}` },
           async (payload) => {
-            const row = payload.new || payload.old;
-            if (!row) return;
-
-            // Ensure team/player context present (e.g., on hot reload)
-            if (!team1 || !team2) {
-              await loadContext();
-            }
-
-            const teams = inferTeamNamesFromState(row);
-            renderBasic(row, teams);
-
-            // Remember last known sides (so we can infer swap on 0/0 (0.0))
-            lastBattingTeam = teams.batting;
-            lastBowlingTeam = teams.bowling;
-
-            await renderPerPlayerStats(row);
+            await handleScoreRow(payload.new);
           }
-        );
+        )
+        .on(
+          "postgres_changes",
+          { event: "UPDATE", schema: "public", table: "scores", filter: `match_id=eq.${matchId}` },
+          async (payload) => {
+            await handleScoreRow(payload.new);
+          }
+        )
+        .subscribe();
+    }
 
-      channel.subscribe();
+    async function handleScoreRow(row) {
+      if (!row) return;
+
+      if (!team1 || !team2) {
+        await loadContext();
+      }
+
+      // Decide sides. If fresh reset to 0/0 (0.0), swap from last known sides.
+      let teams;
+      if (isResetRow(row) && lastBattingTeam && lastBowlingTeam) {
+        teams = swapSides({ batting: lastBattingTeam, bowling: lastBowlingTeam });
+      } else {
+        teams = inferTeamNamesFromState(row);
+      }
+
+      renderBasic(row, teams);
+      lastBattingTeam = teams.batting;
+      lastBowlingTeam = teams.bowling;
+
+      await renderPerPlayerStats(row);
     }
 
     loadInitial();
