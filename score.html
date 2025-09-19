@@ -399,7 +399,7 @@
       await ensureBattingRow(non_striker);
       await ensureBowlingRow(bowler);
 
-      // Lock initial selections; enable scoring
+      // Lock selections; enable scoring
       document.querySelectorAll("#selectorsBox select").forEach(el=>el.disabled = true);
       document.getElementById("btnConfirmInitial").disabled = true;
       enableScoring(true);
@@ -583,26 +583,58 @@
       pushHistory(snap);
     }
 
+    // ------- END INNINGS (UPDATED) -------
     async function endInnings() {
-      // Save state, then swap teams, clear players; keep score in DB as is.
-      const snap = { type: "end_innings", prev: { runs, wickets, overs, balls, striker, non_striker, bowler, battingTeam, bowlingTeam, battingPlayers:[...battingPlayers], bowlingPlayers:[...bowlingPlayers] } };
+      // Save state, then swap teams; reset score for new innings; refresh selectors; keep history for undo.
+      const snap = { 
+        type: "end_innings", 
+        prev: { 
+          runs, wickets, overs, balls, striker, non_striker, bowler, battingTeam, bowlingTeam, 
+          battingPlayers:[...battingPlayers], bowlingPlayers:[...bowlingPlayers] 
+        } 
+      };
 
       commentary = "Innings ended.";
-      await saveScore(); updateDisplay();
+      await saveScore(); 
+      updateDisplay();
 
-      // Switch innings
+      // Switch innings (swap teams and players)
       [battingTeam, bowlingTeam] = [bowlingTeam, battingTeam];
       [battingPlayers, bowlingPlayers] = [bowlingPlayers, battingPlayers];
+
+      // Reset match stats for new innings (NRR will show 0.00 due to 0 overs)
+      runs = 0; wickets = 0; overs = 0; balls = 0;
       striker = "None"; non_striker = "None"; bowler = "None";
 
-      // Unlock selects to choose fresh
+      // Repopulate selectors with new batting/bowling teams
+      const strikerSel = document.getElementById("strikerSelect");
+      const nonSel = document.getElementById("nonStrikerSelect");
+      const bowlSel = document.getElementById("bowlerSelect");
+
+      strikerSel.innerHTML = "<option value=''>-- Select --</option>";
+      nonSel.innerHTML = "<option value=''>-- Select --</option>";
+      bowlSel.innerHTML = "<option value=''>-- Select --</option>";
+
+      battingPlayers.forEach(p=>{
+        strikerSel.innerHTML += `<option value="${p}">${p}</option>`;
+        nonSel.innerHTML += `<option value="${p}">${p}</option>`;
+      });
+      bowlingPlayers.forEach(p=>{
+        bowlSel.innerHTML += `<option value="${p}">${p}</option>`;
+      });
+
+      document.getElementById("battingTeam").textContent = `Batting Team: ${battingTeam}`;
+      document.getElementById("bowlingTeam").textContent = `Bowling Team: ${bowlingTeam}`;
+
+      // Unlock selects to choose fresh for 2nd innings; scoring remains disabled until confirmed
       document.getElementById("strikerSelect").disabled = false;
       document.getElementById("nonStrikerSelect").disabled = false;
       document.getElementById("bowlerSelect").disabled = false;
       document.getElementById("btnConfirmInitial").disabled = false;
       enableScoring(false);
 
-      await saveScore(); updateDisplay();
+      await saveScore(); 
+      updateDisplay();
       pushHistory(snap);
     }
 
@@ -617,7 +649,6 @@
 
       // Reverse DB side-effects for each op type
       if (h.type === "run") {
-        // reverse batting & bowling increments
         await adjBatting(h.prev.striker, -h.r, -1, h.r===4?-1:0, h.r===6?-1:0);
         await adjBowling(h.prev.bowler, -h.r, 0, h.overEnded?-1:0);
       } else if (h.type === "extra") {
@@ -640,7 +671,7 @@
         document.getElementById("btnConfirmNewBat").style.display = "none";
         document.getElementById("strikerSelect").disabled = true;
       } else if (h.type === "swap") {
-        // nothing extra, state restored above
+        // state already restored above
       } else if (h.type === "end_innings") {
         battingTeam = h.prev.battingTeam; bowlingTeam = h.prev.bowlingTeam;
         battingPlayers = h.prev.battingPlayers; bowlingPlayers = h.prev.bowlingPlayers;
